@@ -14,6 +14,10 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
+import android.support.v7.app.MediaRouteButton;
+import android.support.v7.media.MediaRouteSelector;
+import android.support.v7.media.MediaRouter;
+import android.support.v7.media.MediaRouter.RouteInfo;
 import android.util.Log;
 import android.view.ContextMenu;
 import android.view.Display;
@@ -39,6 +43,13 @@ import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.ViewFlipper;
+
+import com.google.cast.CastContext;
+import com.google.cast.CastDevice;
+import com.google.cast.MediaRouteAdapter;
+import com.google.cast.MediaRouteHelper;
+import com.google.cast.MediaRouteStateChangeListener;
+
 import github.daneren2005.dsub.R;
 import github.daneren2005.dsub.domain.MusicDirectory;
 import github.daneren2005.dsub.domain.PlayerState;
@@ -63,7 +74,7 @@ import github.daneren2005.dsub.activity.EqualizerActivity;
 import github.daneren2005.dsub.activity.MainActivity;
 import github.daneren2005.dsub.activity.SubsonicActivity;
 
-public class DownloadFragment extends SubsonicFragment implements OnGestureListener {
+public class DownloadFragment extends SubsonicFragment implements OnGestureListener, MediaRouteAdapter {
 	private static final String TAG = DownloadFragment.class.getSimpleName();
 
 	public static final int DIALOG_SAVE_PLAYLIST = 100;
@@ -105,6 +116,14 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 	private SongListAdapter songListAdapter;
 	private SilentBackgroundTask<Void> onProgressChangedTask;
 	private boolean seekInProgress = false;
+	
+	
+	private MediaRouter mediaRouter;
+	private MediaRouteSelector mediaRouteSelector;
+	private MediaRouter.Callback mediaRouterCallback;
+	private CastContext castContext;
+	private CastDevice selectedDevice;
+	private MediaRouteStateChangeListener routeStateListener;
 
 	/**
 	 * Called when the activity is first created.
@@ -481,6 +500,30 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 			if(getDownloadService() != null && getDownloadService().getSleepTimer()) {
 				menu.findItem(R.id.menu_toggle_timer).setTitle(R.string.download_stop_timer);
 			}
+			
+			if(castContext == null) {
+				castContext = new CastContext(context);
+				MediaRouteHelper.registerMinimalMediaRouteProvider(castContext, this);
+				mediaRouter = MediaRouter.getInstance(context);
+				mediaRouteSelector = MediaRouteHelper.buildMediaRouteSelector(MediaRouteHelper.CATEGORY_CAST);
+		        
+		        mediaRouterCallback = new MediaRouter.Callback() {
+					@Override
+			        public void onRouteSelected(MediaRouter router, RouteInfo route) {
+			            MediaRouteHelper.requestCastDeviceForRoute(route);
+			        }
+			
+			        @Override
+			        public void onRouteUnselected(MediaRouter router, RouteInfo route) {
+			            selectedDevice = null;
+			            routeStateListener = null;
+			        }
+				};
+			}
+			
+			MenuItem mediaRouteItem = menu.findItem(R.id.menu_mediaroute);
+			MediaRouteButton mediaRouteButton = (MediaRouteButton) mediaRouteItem.getActionView();
+			mediaRouteButton.setRouteSelector(mediaRouteSelector);
 		}
 		if(getDownloadService() != null && getDownloadService().getKeepScreenOn()) {
 			menu.findItem(R.id.menu_screen_on_off).setTitle(R.string.download_menu_screen_off);
@@ -668,6 +711,12 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 				return false;
 		}
 	}
+	
+	@Override
+    public void onStart() {
+    	super.onStart();
+    	mediaRouter.addCallback(mediaRouteSelector, mediaRouterCallback, MediaRouter.CALLBACK_FLAG_REQUEST_DISCOVERY);
+    }
 
 	@Override
 	public void onResume() {
@@ -709,6 +758,12 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 
 		updateButtons();
 	}
+	
+	@Override
+    public void onStop() {
+    	mediaRouter.removeCallback(mediaRouterCallback);
+    	super.onStop();
+    }
 
 	@Override
 	public void onPause() {
@@ -717,6 +772,13 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 		if (visualizerView != null && visualizerView.isActive()) {
 			visualizerView.setActive(false);
 		}
+	}
+	
+	@Override
+	public void onDestroy() {
+		MediaRouteHelper.unregisterMediaRouteProvider(castContext);
+        castContext.dispose();
+        super.onDestroy();
 	}
 	
 	@Override
@@ -1173,5 +1235,21 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 	@Override
 	public boolean onSingleTapUp(MotionEvent e) {
 		return false;
+	}
+	
+	@Override
+	public void onDeviceAvailable(CastDevice device, MediaRouteStateChangeListener listener) {
+		selectedDevice = device;
+		routeStateListener = listener;
+	}
+
+	@Override
+	public void onSetVolume(double volume) {
+		// Handle volume change.
+	}
+	
+	@Override
+	public void onUpdateVolume(double delta) {
+		// Handle volume change.
 	}
 }
