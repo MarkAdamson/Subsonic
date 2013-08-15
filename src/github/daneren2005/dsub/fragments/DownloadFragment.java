@@ -44,11 +44,17 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.ViewFlipper;
 
+import com.google.cast.ApplicationChannel;
+import com.google.cast.ApplicationMetadata;
+import com.google.cast.ApplicationSession;
+import com.google.cast.ApplicationSessionError;
 import com.google.cast.CastContext;
 import com.google.cast.CastDevice;
 import com.google.cast.MediaRouteAdapter;
 import com.google.cast.MediaRouteHelper;
 import com.google.cast.MediaRouteStateChangeListener;
+import com.google.cast.MessageStream;
+import com.google.cast.MediaProtocolMessageStream;
 
 import github.daneren2005.dsub.R;
 import github.daneren2005.dsub.domain.MusicDirectory;
@@ -117,13 +123,14 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 	private SilentBackgroundTask<Void> onProgressChangedTask;
 	private boolean seekInProgress = false;
 	
-	
 	private MediaRouter mediaRouter;
 	private MediaRouteSelector mediaRouteSelector;
 	private MediaRouter.Callback mediaRouterCallback;
+	private MediaRouteStateChangeListener routeStateListener;
 	private CastContext castContext;
 	private CastDevice selectedDevice;
-	private MediaRouteStateChangeListener routeStateListener;
+	private ApplicationSession applicationSession;
+	private MediaProtocolMessageStream messageStream;
 
 	/**
 	 * Called when the activity is first created.
@@ -515,6 +522,10 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 			
 			        @Override
 			        public void onRouteUnselected(MediaRouter router, RouteInfo route) {
+			        	if(applicationSession != null) {
+			        		applicationSession.endSession();
+			        		applicationSession = null;
+			        	}
 			            selectedDevice = null;
 			            routeStateListener = null;
 			        }
@@ -1241,6 +1252,41 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 	public void onDeviceAvailable(CastDevice device, MediaRouteStateChangeListener listener) {
 		selectedDevice = device;
 		routeStateListener = listener;
+		
+		applicationSession = new ApplicationSession(castContext, device);
+		ApplicationSession.Listener listener = new ApplicationSession.Listener() {
+			@Override
+			void onSessionStarted(ApplicationMetadata appMetadata) {
+				if (!applicationSession.hasChannel()) {
+					return;
+				}
+				
+				ApplicationChannel channel = session.getChannel();
+				messageStream = new MediaProtocolMessageStream();
+				channel.attachMessageStream(messageStream);
+			}
+			
+			@Override
+			void onSessionStartFailed(SessionError error) {
+				// The session could not be started.
+			}
+			
+			@Override
+				void onSessionEnded(SessionError error) {
+				if (error != null) {
+					// The session ended due to an error.
+				} else {
+					// The session ended normally.
+				}
+			}
+		}
+		applicationSession.setListener(listener);
+		
+		int flags = ApplicationSession.FLAG_DISABLE_NOTIFICATION | ApplicationSession.FLAG_DISABLE_LOCK_SCREEN_REMOTE_CONTROL;
+		applicationSession.setApplicationOptions(flags);
+		
+		String applicationName = “DSub”;
+		applicationSession.startSession(applicationName);
 	}
 
 	@Override
