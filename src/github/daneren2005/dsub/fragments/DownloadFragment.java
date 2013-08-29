@@ -15,6 +15,9 @@ import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.v7.app.MediaRouteButton;
+import android.support.v7.media.MediaRouteDescriptor;
+import android.support.v7.media.MediaRouteProvider;
+import android.support.v7.media.MediaRouteProviderDescriptor;
 import android.support.v7.media.MediaRouteSelector;
 import android.support.v7.media.MediaRouter;
 import android.support.v7.media.MediaRouter.RouteInfo;
@@ -509,6 +512,21 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 			}
 			
 			if(castContext == null) {
+				// Jukebox MediaRoute creation
+				// Create custom route
+				MediaRouteDescriptor.Builder routeBuilder = new MediaRouteDescriptor.Builder("Jukebox Route", "Subsonic Jukebox");
+				routeBuilder.setDescription("Subsonic Jukebox");
+				routeBuilder.setVolume(5);
+				routeBuilder.setVolumeMax(10);
+				
+				// Create custom provider
+				MediaRouteProviderDescriptor.Builder providerBuilder = new MediaRouteProviderDescriptor.Builder();
+				providerBuilder.addRoute(routeBuilder.build());
+				MediaRouteProvider routeProvider = new MediaRouteProvider(context);
+				routeProvider.setDescriptor(providerBuilder.build());
+				
+				// TODO: Do something with it...
+				
 				castContext = new CastContext(context);
 				MediaRouteHelper.registerMinimalMediaRouteProvider(castContext, this);
 				mediaRouter = MediaRouter.getInstance(context);
