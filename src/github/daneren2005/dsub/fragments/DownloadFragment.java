@@ -9,6 +9,7 @@ import java.util.concurrent.TimeUnit;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -512,9 +513,13 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 			}
 			
 			if(castContext == null) {
+				mediaRouter = MediaRouter.getInstance(context);
+				
 				// Jukebox MediaRoute creation
 				// Create custom route
 				MediaRouteDescriptor.Builder routeBuilder = new MediaRouteDescriptor.Builder("Jukebox Route", "Subsonic Jukebox");
+				IntentFilter routeIntentFilter = new IntentFilter("github.daneren2005.dsub.jukebox");
+				routeBuilder.addControlFilter(routeIntentFilter);
 				routeBuilder.setDescription("Subsonic Jukebox");
 				routeBuilder.setVolume(5);
 				routeBuilder.setVolumeMax(10);
@@ -525,12 +530,18 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 				MediaRouteProvider routeProvider = new MediaRouteProvider(context);
 				routeProvider.setDescriptor(providerBuilder.build());
 				
-				// TODO: Do something with it...
+				// Register custom provider
+				mediaRouter.addProvider(routeProvider);
 				
+				// Create cast context, get selector
 				castContext = new CastContext(context);
 				MediaRouteHelper.registerMinimalMediaRouteProvider(castContext, this);
-				mediaRouter = MediaRouter.getInstance(context);
 				mediaRouteSelector = MediaRouteHelper.buildMediaRouteSelector(MediaRouteHelper.CATEGORY_CAST);
+				
+				// Add custom intent filter to the returned mediaRouteSelector
+				MediaRouteSelector.Builder selectorBuilder = new MediaRouteSelector.Builder(mediaRouteSelector);
+				selectorBuilder.addControlCategory(routeIntentFilter);
+				mediaRouteSelector = selectorBuilder.build();
 		        
 		        mediaRouterCallback = new MediaRouter.Callback() {
 					@Override
