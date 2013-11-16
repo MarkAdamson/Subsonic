@@ -17,6 +17,7 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="appcompat" />
+    <orderEntry type="module" module-name="mediarouter" />
     <orderEntry type="module" module-name="DragSortListView" />
   </component>
 </module>

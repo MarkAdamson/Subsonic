@@ -19,6 +19,7 @@ import android.support.v7.app.MediaRouteButton;
 import android.support.v7.media.MediaRouteDescriptor;
 import android.support.v7.media.MediaRouteProvider;
 import android.support.v7.media.MediaRouteProviderDescriptor;
+import android.support.v7.media.MediaRouteProviderService;
 import android.support.v7.media.MediaRouteSelector;
 import android.support.v7.media.MediaRouter;
 import android.support.v7.media.MediaRouter.RouteInfo;
@@ -51,13 +52,11 @@ import android.widget.ViewFlipper;
 import com.google.cast.ApplicationChannel;
 import com.google.cast.ApplicationMetadata;
 import com.google.cast.ApplicationSession;
-import com.google.cast.ApplicationSessionError;
 import com.google.cast.CastContext;
 import com.google.cast.CastDevice;
 import com.google.cast.MediaRouteAdapter;
 import com.google.cast.MediaRouteHelper;
 import com.google.cast.MediaRouteStateChangeListener;
-import com.google.cast.MessageStream;
 import com.google.cast.MediaProtocolMessageStream;
 
 import github.daneren2005.dsub.R;
@@ -82,6 +81,8 @@ import github.daneren2005.dsub.util.*;
 import github.daneren2005.dsub.view.AutoRepeatButton;
 import java.util.ArrayList;
 import java.util.concurrent.ScheduledFuture;
+
+import com.google.cast.SessionError;
 import com.mobeta.android.dslv.*;
 import github.daneren2005.dsub.activity.SubsonicActivity;
 
@@ -516,6 +517,8 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 			visualizerViewLayout.addView(visualizerView, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.FILL_PARENT, LinearLayout.LayoutParams.FILL_PARENT));
 		}
 
+		setupMediaRouter();
+
 		return rootView;
 	}
 
@@ -534,55 +537,6 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 
 			if(downloadService != null && downloadService.getSleepTimer()) {
 				menu.findItem(R.id.menu_toggle_timer).setTitle(R.string.download_stop_timer);
-			}
-			
-			if(castContext == null) {
-				mediaRouter = MediaRouter.getInstance(context);
-				
-				// Jukebox MediaRoute creation
-				// Create custom route
-				MediaRouteDescriptor.Builder routeBuilder = new MediaRouteDescriptor.Builder("Jukebox Route", "Subsonic Jukebox");
-				IntentFilter routeIntentFilter = new IntentFilter("github.daneren2005.dsub.jukebox");
-				routeBuilder.addControlFilter(routeIntentFilter);
-				routeBuilder.setDescription("Subsonic Jukebox");
-				routeBuilder.setVolume(5);
-				routeBuilder.setVolumeMax(10);
-				
-				// Create custom provider
-				MediaRouteProviderDescriptor.Builder providerBuilder = new MediaRouteProviderDescriptor.Builder();
-				providerBuilder.addRoute(routeBuilder.build());
-				MediaRouteProvider routeProvider = new MediaRouteProvider(context);
-				routeProvider.setDescriptor(providerBuilder.build());
-				
-				// Register custom provider
-				mediaRouter.addProvider(routeProvider);
-				
-				// Create cast context, get selector
-				castContext = new CastContext(context);
-				MediaRouteHelper.registerMinimalMediaRouteProvider(castContext, this);
-				mediaRouteSelector = MediaRouteHelper.buildMediaRouteSelector(MediaRouteHelper.CATEGORY_CAST);
-				
-				// Add custom intent filter to the returned mediaRouteSelector
-				MediaRouteSelector.Builder selectorBuilder = new MediaRouteSelector.Builder(mediaRouteSelector);
-				selectorBuilder.addControlCategory(routeIntentFilter);
-				mediaRouteSelector = selectorBuilder.build();
-		        
-		        mediaRouterCallback = new MediaRouter.Callback() {
-					@Override
-			        public void onRouteSelected(MediaRouter router, RouteInfo route) {
-			            MediaRouteHelper.requestCastDeviceForRoute(route);
-			        }
-			
-			        @Override
-			        public void onRouteUnselected(MediaRouter router, RouteInfo route) {
-			        	if(applicationSession != null) {
-			        		applicationSession.endSession();
-			        		applicationSession = null;
-			        	}
-			            selectedDevice = null;
-			            routeStateListener = null;
-			        }
-				};
 			}
 			
 			MenuItem mediaRouteItem = menu.findItem(R.id.menu_mediaroute);
@@ -868,6 +822,60 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 				mainLayout.setVisibility(View.GONE);
 			}
 		}
+	}
+
+	private void setupMediaRouter() {
+		// Start MediaRouter API stuff
+		mediaRouter = MediaRouter.getInstance(context);
+
+		// Jukebox MediaRoute creation
+		// Create custom route
+		MediaRouteDescriptor.Builder routeBuilder = new MediaRouteDescriptor.Builder("Jukebox Route", "Subsonic Jukebox");
+		IntentFilter routeIntentFilter = new IntentFilter("github.daneren2005.dsub.jukebox");
+		routeBuilder.addControlFilter(routeIntentFilter);
+		routeBuilder.setDescription("Subsonic Jukebox");
+		routeBuilder.setVolume(5);
+		routeBuilder.setVolumeMax(10);
+
+		// Create custom provider
+		MediaRouteProviderDescriptor.Builder providerBuilder = new MediaRouteProviderDescriptor.Builder();
+		providerBuilder.addRoute(routeBuilder.build());
+		// MediaRouteProvider routeProvider = new MediaRouteProvider(context);
+		// routeProvider.setDescriptor(providerBuilder.build());
+
+		// Register custom provider
+		// mediaRouter.addProvider(routeProvider);
+
+		// Create cast context, get selector
+		castContext = new CastContext(context);
+		MediaRouteHelper.registerMinimalMediaRouteProvider(castContext, this);
+		mediaRouteSelector = MediaRouteHelper.buildMediaRouteSelector(MediaRouteHelper.CATEGORY_CAST);
+
+		// Add custom intent filter to the returned mediaRouteSelector
+		MediaRouteSelector.Builder selectorBuilder = new MediaRouteSelector.Builder(mediaRouteSelector);
+		// selectorBuilder.addControlCategory(routeIntentFilter);
+		mediaRouteSelector = selectorBuilder.build();
+
+		mediaRouterCallback = new MediaRouter.Callback() {
+			@Override
+			public void onRouteSelected(MediaRouter router, RouteInfo route) {
+				MediaRouteHelper.requestCastDeviceForRoute(route);
+			}
+
+			@Override
+			public void onRouteUnselected(MediaRouter router, RouteInfo route) {
+				if(applicationSession != null) {
+					try {
+						applicationSession.endSession();
+					} catch(Exception e) {
+						// TODO: What does this mean?
+					}
+					applicationSession = null;
+				}
+				selectedDevice = null;
+				routeStateListener = null;
+			}
+		};
 	}
 
 	private void scheduleHideControls() {
@@ -1425,44 +1433,49 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 	}
 	
 	@Override
-	public void onDeviceAvailable(CastDevice device, MediaRouteStateChangeListener listener) {
+	public void onDeviceAvailable(CastDevice device, String string, MediaRouteStateChangeListener listener) {
 		selectedDevice = device;
 		routeStateListener = listener;
 		
 		applicationSession = new ApplicationSession(castContext, device);
-		ApplicationSession.Listener listener = new ApplicationSession.Listener() {
+		ApplicationSession.Listener applicationListener = new ApplicationSession.Listener() {
 			@Override
-			void onSessionStarted(ApplicationMetadata appMetadata) {
+			public void onSessionStarted(ApplicationMetadata appMetadata) {
 				if (!applicationSession.hasChannel()) {
 					return;
 				}
 				
-				ApplicationChannel channel = session.getChannel();
+				ApplicationChannel channel = applicationSession.getChannel();
 				messageStream = new MediaProtocolMessageStream();
 				channel.attachMessageStream(messageStream);
 			}
 			
 			@Override
-			void onSessionStartFailed(SessionError error) {
+			public void onSessionStartFailed(SessionError error) {
 				// The session could not be started.
 			}
 			
 			@Override
-				void onSessionEnded(SessionError error) {
+			public void onSessionEnded(SessionError error) {
 				if (error != null) {
 					// The session ended due to an error.
 				} else {
 					// The session ended normally.
 				}
 			}
-		}
-		applicationSession.setListener(listener);
+		};
+		applicationSession.setListener(applicationListener);
 		
 		int flags = ApplicationSession.FLAG_DISABLE_NOTIFICATION | ApplicationSession.FLAG_DISABLE_LOCK_SCREEN_REMOTE_CONTROL;
 		applicationSession.setApplicationOptions(flags);
 		
-		String applicationName = “DSub”;
-		applicationSession.startSession(applicationName);
+		String applicationName = "DSub";
+
+		try {
+			applicationSession.startSession(applicationName);
+		} catch(Exception e) {
+			// TODO: Handle death
+		}
 	}
 
 	@Override
