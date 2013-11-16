@@ -1,11 +1,14 @@
 package github.daneren2005.dsub.fragments;
 
+import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Dictionary;
 import java.util.List;
 import java.util.Arrays;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.ContextMenu;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -15,11 +18,9 @@ import android.view.MenuItem;
 import android.widget.AdapterView;
 import android.widget.ListAdapter;
 import android.widget.ListView;
-import android.widget.TextView;
 import android.net.Uri;
 import android.view.ViewGroup;
 import github.daneren2005.dsub.R;
-import github.daneren2005.dsub.activity.SearchActivity;
 import github.daneren2005.dsub.domain.Artist;
 import github.daneren2005.dsub.domain.MusicDirectory;
 import github.daneren2005.dsub.domain.SearchCritera;
@@ -36,6 +37,8 @@ import github.daneren2005.dsub.util.TabBackgroundTask;
 import github.daneren2005.dsub.util.Util;
 
 public class SearchFragment extends SubsonicFragment {
+	private static final String TAG = SearchFragment.class.getSimpleName();
+
 	private static final int DEFAULT_ARTISTS = 3;
 	private static final int DEFAULT_ALBUMS = 5;
 	private static final int DEFAULT_SONGS = 10;
@@ -48,7 +51,6 @@ public class SearchFragment extends SubsonicFragment {
 	private View artistsHeading;
 	private View albumsHeading;
 	private View songsHeading;
-	private TextView searchButton;
 	private View moreArtistsButton;
 	private View moreAlbumsButton;
 	private View moreSongsButton;
@@ -60,15 +62,26 @@ public class SearchFragment extends SubsonicFragment {
 	private ListAdapter moreAlbumsAdapter;
 	private ListAdapter moreSongsAdapter;
 	private EntryAdapter songAdapter;
+	private boolean skipSearch = false;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+
+		if(savedInstanceState != null) {
+			searchResult = (SearchResult) savedInstanceState.getSerializable(Constants.FRAGMENT_LIST);
+		}
+	}
+
+	@Override
+	public void onSaveInstanceState(Bundle outState) {
+		super.onSaveInstanceState(outState);
+		outState.putSerializable(Constants.FRAGMENT_LIST, searchResult);
 	}
 
 	@Override
 	public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle bundle) {
-		rootView = inflater.inflate(R.layout.search, container, false);
+		rootView = inflater.inflate(R.layout.abstract_list_fragment, container, false);
 		setTitle(R.string.search_title);
 
 		View buttons = inflater.inflate(R.layout.search_buttons, null);
@@ -77,19 +90,16 @@ public class SearchFragment extends SubsonicFragment {
 		albumsHeading = buttons.findViewById(R.id.search_albums);
 		songsHeading = buttons.findViewById(R.id.search_songs);
 
-		searchButton = (TextView) buttons.findViewById(R.id.search_search);
 		moreArtistsButton = buttons.findViewById(R.id.search_more_artists);
 		moreAlbumsButton = buttons.findViewById(R.id.search_more_albums);
 		moreSongsButton = buttons.findViewById(R.id.search_more_songs);
 
-		list = (ListView) rootView.findViewById(R.id.search_list);
+		list = (ListView) rootView.findViewById(R.id.fragment_list);
 
 		list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
 			@Override
 			public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-				if (view == searchButton) {
-					context.onSearchRequested();
-				} else if (view == moreArtistsButton) {
+				if (view == moreArtistsButton) {
 					expandArtists();
 				} else if (view == moreAlbumsButton) {
 					expandAlbums();
@@ -114,7 +124,13 @@ public class SearchFragment extends SubsonicFragment {
 			}
 		});
 		registerForContextMenu(list);
-		((SearchActivity)context).onSupportNewIntent(context.getIntent());
+		context.onNewIntent(context.getIntent());
+
+		if(searchResult != null) {
+			skipSearch = true;
+            populateList();
+		}
+
 		return rootView;
 	}
 
@@ -135,6 +151,9 @@ public class SearchFragment extends SubsonicFragment {
 	@Override
 	public void onCreateContextMenu(ContextMenu menu, View view, ContextMenu.ContextMenuInfo menuInfo) {
 		super.onCreateContextMenu(menu, view, menuInfo);
+		if(!primaryFragment) {
+			return;
+		}
 
 		AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) menuInfo;
 		Object selectedItem = list.getItemAtPosition(info.position);
@@ -164,11 +183,15 @@ public class SearchFragment extends SubsonicFragment {
 	public void setPrimaryFragment(boolean primary) {
 		super.setPrimaryFragment(primary);
 		if(rootView != null && primary) {
-			((SearchActivity)context).onSupportNewIntent(context.getIntent());
+			context.onNewIntent(context.getIntent());
 		}
 	}
 
 	public void search(final String query, final boolean autoplay) {
+		if(skipSearch) {
+			skipSearch = false;
+			return;
+		}
 		mergeAdapter = new MergeAdapter();
 		list.setAdapter(mergeAdapter);
 		
@@ -195,7 +218,6 @@ public class SearchFragment extends SubsonicFragment {
 
 	public void populateList() {
 		mergeAdapter = new MergeAdapter();
-		mergeAdapter.addView(searchButton, true);
 
 		if (searchResult != null) {
 			List<Artist> artists = searchResult.getArtists();
@@ -232,7 +254,6 @@ public class SearchFragment extends SubsonicFragment {
 			}
 
 			boolean empty = searchResult.getArtists().isEmpty() && searchResult.getAlbums().isEmpty() && searchResult.getSongs().isEmpty();
-			searchButton.setText(empty ? R.string.search_no_match : R.string.search_search);
 		}
 
 		list.setAdapter(mergeAdapter);
@@ -275,11 +296,11 @@ public class SearchFragment extends SubsonicFragment {
 		args.putString(Constants.INTENT_EXTRA_NAME_NAME, artist.getName());
 		fragment.setArguments(args);
 
-		replaceFragment(fragment, R.id.search_layout);
+		replaceFragment(fragment, R.id.fragment_list_layout);
 	}
 
 	private void onAlbumSelected(MusicDirectory.Entry album, boolean autoplay) {
-		int id = R.id.search_layout;
+		int id = R.id.fragment_list_layout;
 		Bundle args;
 		if(album.getParent() != null) {
 			SubsonicFragment parentFragment = new SelectDirectoryFragment();
@@ -288,7 +309,7 @@ public class SearchFragment extends SubsonicFragment {
 			args.putString(Constants.INTENT_EXTRA_NAME_NAME, album.getArtist());
 			parentFragment.setArguments(args);
 
-			replaceFragment(parentFragment, R.id.search_layout);
+			replaceFragment(parentFragment, R.id.fragment_list_layout);
 			id = parentFragment.getRootId();
 		}
 		

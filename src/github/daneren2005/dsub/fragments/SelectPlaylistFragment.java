@@ -30,6 +30,8 @@ import github.daneren2005.dsub.util.LoadingTask;
 import github.daneren2005.dsub.util.TabBackgroundTask;
 import github.daneren2005.dsub.util.Util;
 import github.daneren2005.dsub.view.PlaylistAdapter;
+
+import java.io.Serializable;
 import java.util.List;
 
 public class SelectPlaylistFragment extends SubsonicFragment implements AdapterView.OnItemClickListener {
@@ -38,24 +40,40 @@ public class SelectPlaylistFragment extends SubsonicFragment implements AdapterV
 	private ListView list;
 	private View emptyTextView;
 	private PlaylistAdapter playlistAdapter;
+	private List<Playlist> playlists;
 
 	@Override
 	public void onCreate(Bundle bundle) {
 		super.onCreate(bundle);
+
+		if(bundle != null) {
+			playlists = (List<Playlist>) bundle.getSerializable(Constants.FRAGMENT_LIST);
+		}
+	}
+
+	@Override
+	public void onSaveInstanceState(Bundle outState) {
+		super.onSaveInstanceState(outState);
+		outState.putSerializable(Constants.FRAGMENT_LIST, (Serializable) playlists);
 	}
 
 	@Override
 	public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle bundle) {
-		rootView = inflater.inflate(R.layout.select_playlist, container, false);
+		rootView = inflater.inflate(R.layout.abstract_list_fragment, container, false);
 
-		list = (ListView) rootView.findViewById(R.id.select_playlist_list);
-		emptyTextView = rootView.findViewById(R.id.select_playlist_empty);
+		list = (ListView) rootView.findViewById(R.id.fragment_list);
+		emptyTextView = rootView.findViewById(R.id.fragment_list_empty);
 		list.setOnItemClickListener(this);
 		registerForContextMenu(list);
-		if(!primaryFragment) {
-			invalidated = true;
+
+		if(playlists == null) {
+			if(!primaryFragment) {
+				invalidated = true;
+			} else {
+				refresh(false);
+			}
 		} else {
-			refresh(false);
+			list.setAdapter(playlistAdapter = new PlaylistAdapter(context, playlists));
 		}
 
 		return rootView;
@@ -63,7 +81,7 @@ public class SelectPlaylistFragment extends SubsonicFragment implements AdapterV
 
 	@Override
 	public void onCreateOptionsMenu(Menu menu, MenuInflater menuInflater) {
-		menuInflater.inflate(R.menu.select_playlist, menu);
+		menuInflater.inflate(R.menu.abstract_top_menu, menu);
 	}
 
 	@Override
@@ -78,6 +96,9 @@ public class SelectPlaylistFragment extends SubsonicFragment implements AdapterV
 	@Override
 	public void onCreateContextMenu(ContextMenu menu, View view, ContextMenu.ContextMenuInfo menuInfo) {
 		super.onCreateContextMenu(menu, view, menuInfo);
+		if(!primaryFragment) {
+			return;
+		}
 
 		MenuInflater inflater = context.getMenuInflater();		
 		if (Util.isOffline(context)) {
@@ -115,7 +136,7 @@ public class SelectPlaylistFragment extends SubsonicFragment implements AdapterV
 				args.putBoolean(Constants.INTENT_EXTRA_NAME_AUTOPLAY, true);
 				fragment.setArguments(args);
 
-				replaceFragment(fragment, R.id.select_playlist_layout);
+				replaceFragment(fragment, R.id.fragment_list_layout);
 				break;
 			case R.id.playlist_menu_play_shuffled:
 				fragment = new SelectDirectoryFragment();
@@ -126,7 +147,7 @@ public class SelectPlaylistFragment extends SubsonicFragment implements AdapterV
 				args.putBoolean(Constants.INTENT_EXTRA_NAME_AUTOPLAY, true);
 				fragment.setArguments(args);
 
-				replaceFragment(fragment, R.id.select_playlist_layout);
+				replaceFragment(fragment, R.id.fragment_list_layout);
 				break;
 			case R.id.playlist_menu_delete:
 				deletePlaylist(playlist);
@@ -153,7 +174,7 @@ public class SelectPlaylistFragment extends SubsonicFragment implements AdapterV
 		args.putString(Constants.INTENT_EXTRA_NAME_PLAYLIST_NAME, playlist.getName());
 		fragment.setArguments(args);
 
-		replaceFragment(fragment, R.id.select_playlist_layout);
+		replaceFragment(fragment, R.id.fragment_list_layout);
 	}
 
 	@Override
@@ -170,7 +191,7 @@ public class SelectPlaylistFragment extends SubsonicFragment implements AdapterV
 			@Override
 			protected List<Playlist> doInBackground() throws Throwable {
 				MusicService musicService = MusicServiceFactory.getMusicService(context);
-				List<Playlist> playlists = musicService.getPlaylists(refresh, context, this);
+				playlists = musicService.getPlaylists(refresh, context, this);
 				if(!Util.isOffline(context) && refresh) {
 					new CacheCleaner(context, getDownloadService()).cleanPlaylists(playlists);
 				}

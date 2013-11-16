@@ -19,6 +19,7 @@
 package github.daneren2005.dsub.view;
 
 import android.content.Context;
+import android.content.res.TypedArray;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -41,17 +42,19 @@ public class UpdateView extends LinearLayout {
 	private static Handler backgroundHandler;
 	private static Handler uiHandler;
 	private static Runnable updateRunnable;
-	
+
+	protected Context context;
 	protected ImageButton starButton;
 	protected ImageView moreButton;
 	
 	protected boolean exists = false;
 	protected boolean shaded = false;
-	protected boolean starred = true;
+	protected boolean starred = false;
 	protected boolean isStarred = false;
 	
 	public UpdateView(Context context) {
 		super(context);
+		this.context = context;
 		
 		setLayoutParams(new AbsListView.LayoutParams(
 			ViewGroup.LayoutParams.FILL_PARENT,
@@ -73,8 +76,18 @@ public class UpdateView extends LinearLayout {
 	}
 	public void setObject(Object obj1, Object obj2) {
 		setObjectImpl(obj1, obj2);
-		updateBackground();
-		update();
+		backgroundHandler.post(new Runnable() {
+			@Override
+			public void run() {
+				updateBackground();
+				uiHandler.post(new Runnable() {
+					@Override
+					public void run() {
+						update();
+					}
+				});
+			}
+		});
 	}
 	protected void setObjectImpl(Object obj) {
 		
@@ -89,6 +102,8 @@ public class UpdateView extends LinearLayout {
 		}
 		
 		uiHandler = new Handler();
+		// Needed so handler is never null until thread creates it
+		backgroundHandler = uiHandler;
 		updateRunnable = new Runnable() {
             @Override
             public void run() {
@@ -156,12 +171,14 @@ public class UpdateView extends LinearLayout {
 		if(moreButton != null) {
 			if(exists) {
 				if(!shaded) {
-					moreButton.setImageResource(R.drawable.list_item_more_shaded);
+					moreButton.setImageResource(R.drawable.download_cached);
 					shaded = true;
 				}
 			} else {
 				if(shaded) {
-					moreButton.setImageResource(R.drawable.list_item_more);
+					int[] attrs = new int[] {R.attr.download_none};
+					TypedArray typedArray = context.obtainStyledAttributes(attrs);
+					moreButton.setImageResource(typedArray.getResourceId(0, 0));
 					shaded = false;
 				}
 			}

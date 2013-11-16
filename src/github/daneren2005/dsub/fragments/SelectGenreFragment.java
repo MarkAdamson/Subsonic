@@ -36,6 +36,8 @@ import github.daneren2005.dsub.util.BackgroundTask;
 import github.daneren2005.dsub.util.Constants;
 import github.daneren2005.dsub.util.TabBackgroundTask;
 import github.daneren2005.dsub.view.GenreAdapter;
+
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -43,26 +45,46 @@ public class SelectGenreFragment extends SubsonicFragment implements AdapterView
 	private static final String TAG = SelectGenreFragment.class.getSimpleName();
 	private ListView genreListView;
 	private View emptyView;
+	private List<Genre> genres;
 
 	@Override
 	public void onCreate(Bundle bundle) {
 		super.onCreate(bundle);
+
+		if(bundle != null) {
+			genres = (List<Genre>) bundle.getSerializable(Constants.FRAGMENT_LIST);
+		}
+	}
+
+	@Override
+	public void onSaveInstanceState(Bundle outState) {
+		super.onSaveInstanceState(outState);
+		outState.putSerializable(Constants.FRAGMENT_LIST, (Serializable) genres);
 	}
 
 	@Override
 	public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle bundle) {
-		rootView = inflater.inflate(R.layout.select_genres, container, false);
+		rootView = inflater.inflate(R.layout.abstract_list_fragment, container, false);
 
-		genreListView = (ListView)rootView.findViewById(R.id.select_genre_list);
+		genreListView = (ListView)rootView.findViewById(R.id.fragment_list);
 		genreListView.setOnItemClickListener(this);
-		emptyView = rootView.findViewById(R.id.select_genre_empty);
-		refresh();
+		emptyView = rootView.findViewById(R.id.fragment_list_empty);
+
+		if(genres == null) {
+			refresh();
+		} else {
+			genreListView.setAdapter(new GenreAdapter(context, genres));
+		}
 
 		return rootView;
 	}
 	
 	@Override
 	public void onCreateOptionsMenu(Menu menu, MenuInflater menuInflater) {
+		if(!primaryFragment) {
+			return;
+		}
+
 		menuInflater.inflate(R.menu.select_genres, menu);
 	}
 	
@@ -73,18 +95,6 @@ public class SelectGenreFragment extends SubsonicFragment implements AdapterView
 		}
 
 		return false;
-	}
-	
-	@Override
-	public void setPrimaryFragment(boolean primary) {
-		super.setPrimaryFragment(primary);
-		if(rootView != null) {
-			if(primary) {
-				((ViewGroup)rootView).getChildAt(0).setVisibility(View.VISIBLE);
-			} else {
-				((ViewGroup)rootView).getChildAt(0).setVisibility(View.GONE);
-			}
-		}
 	}
 
 	@Override
@@ -101,7 +111,7 @@ public class SelectGenreFragment extends SubsonicFragment implements AdapterView
 			protected List<Genre> doInBackground() throws Throwable {
 				MusicService musicService = MusicServiceFactory.getMusicService(context);
 
-				List<Genre> genres = new ArrayList<Genre>(); 
+				genres = new ArrayList<Genre>();
 
 				try {
 					genres = musicService.getGenres(refresh, context, this);
@@ -137,6 +147,6 @@ public class SelectGenreFragment extends SubsonicFragment implements AdapterView
 		args.putString(Constants.INTENT_EXTRA_NAME_ALBUM_LIST_EXTRA, genre.getName());
 		fragment.setArguments(args);
 
-		replaceFragment(fragment, R.id.select_genre_layout);
+		replaceFragment(fragment, R.id.fragment_list_layout);
 	}
 }

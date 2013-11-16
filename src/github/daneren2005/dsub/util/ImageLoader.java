@@ -76,6 +76,9 @@ public class ImageLoader implements Runnable {
 			protected void entryRemoved(boolean evicted, String key, Bitmap oldBitmap, Bitmap newBitmap) {
 				if(evicted && oldBitmap != nowPlaying) {
 					oldBitmap.recycle();
+					Log.d(TAG, "Recycled: " + sizeOf(key, oldBitmap) + "/" + cacheSize);
+				} else if(evicted) {
+					Log.d(TAG, "Skipped recycle: " + sizeOf(key, oldBitmap) + "/" + cacheSize);
 				}
 			}
 		};

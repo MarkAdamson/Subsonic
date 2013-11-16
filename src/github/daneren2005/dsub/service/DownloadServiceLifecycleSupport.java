@@ -31,9 +31,12 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.media.RemoteControlClient;
 import android.os.AsyncTask;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
 import android.util.Log;
@@ -41,6 +44,7 @@ import android.view.KeyEvent;
 import github.daneren2005.dsub.domain.MusicDirectory;
 import github.daneren2005.dsub.domain.PlayerState;
 import github.daneren2005.dsub.util.CacheCleaner;
+import github.daneren2005.dsub.util.Constants;
 import github.daneren2005.dsub.util.FileUtil;
 import github.daneren2005.dsub.util.Util;
 
@@ -50,9 +54,11 @@ import github.daneren2005.dsub.util.Util;
 public class DownloadServiceLifecycleSupport {
 
     private static final String TAG = DownloadServiceLifecycleSupport.class.getSimpleName();
-    private static final String FILENAME_DOWNLOADS_SER = "downloadstate.ser";
+    private static final String FILENAME_DOWNLOADS_SER = "downloadstate2.ser";
 
     private final DownloadServiceImpl downloadService;
+    private Looper eventLooper;
+    private Handler eventHandler;
     private ScheduledExecutorService executorService;
     private BroadcastReceiver headsetEventReceiver;
     private BroadcastReceiver ejectEventReceiver;
@@ -106,6 +112,26 @@ public class DownloadServiceLifecycleSupport {
 
         executorService = Executors.newSingleThreadScheduledExecutor();
         executorService.scheduleWithFixedDelay(downloadChecker, 5, 5, TimeUnit.SECONDS);
+        
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				Looper.prepare();
+				eventLooper = Looper.myLooper();
+				eventHandler = new Handler(eventLooper);
+
+				// Deserialize queue before starting looper
+				try {
+					lock.lock();
+					deserializeDownloadQueueNow();
+					setup.set(true);
+				} finally {
+					lock.unlock();
+				}
+
+				Looper.loop();
+			}
+		}).start();
 
         // Pause when headset is unplugged.
         headsetEventReceiver = new BroadcastReceiver() {
@@ -113,9 +139,18 @@ public class DownloadServiceLifecycleSupport {
             public void onReceive(Context context, Intent intent) {
                 Log.i(TAG, "Headset event for: " + intent.getExtras().get("name"));
                 if (intent.getExtras().getInt("state") == 0) {
-					if(!downloadService.isRemoteEnabled()) {
-						downloadService.pause();
-					}
+                	eventHandler.post(new Runnable() {
+						@Override
+						public void run() {
+							if(!downloadService.isRemoteEnabled()) {
+								SharedPreferences prefs = Util.getPreferences(downloadService);
+								int pausePref = Integer.parseInt(prefs.getString(Constants.PREFERENCES_KEY_PAUSE_DISCONNECT, "0"));
+								if(pausePref == 0 || pausePref == 1) {
+									downloadService.pause();
+								}
+							}
+						}
+                	});
                 }
             }
         };
@@ -157,22 +192,30 @@ public class DownloadServiceLifecycleSupport {
         commandFilter.addAction(DownloadServiceImpl.CMD_NEXT);
         downloadService.registerReceiver(intentReceiver, commandFilter);
 
-        deserializeDownloadQueue();
-
         new CacheCleaner(downloadService, downloadService).clean();
     }
 
     public void onStart(Intent intent) {
         if (intent != null && intent.getExtras() != null) {
-            KeyEvent event = (KeyEvent) intent.getExtras().get(Intent.EXTRA_KEY_EVENT);
+            final KeyEvent event = (KeyEvent) intent.getExtras().get(Intent.EXTRA_KEY_EVENT);
             if (event != null) {
-                handleKeyEvent(event);
+				eventHandler.post(new Runnable() {
+					@Override
+					public void run() {
+						if(!setup.get()) {
+							lock.lock();
+							lock.unlock();
+						}
+						handleKeyEvent(event);
+					}
+				});
             }
         }
     }
 
     public void onDestroy() {
         executorService.shutdown();
+        eventLooper.quit();
         serializeDownloadQueueNow();
         downloadService.clear(false);
         downloadService.unregisterReceiver(ejectEventReceiver);
@@ -192,11 +235,18 @@ public class DownloadServiceLifecycleSupport {
     		return;
     	}
     	
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
-			new SerializeTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
-		} else {
-			new SerializeTask().execute();
-		}
+		eventHandler.post(new Runnable() {
+			@Override
+			public void run() {
+				if(lock.tryLock()) {
+					try {
+						serializeDownloadQueueNow();
+					} finally {
+						lock.unlock();
+					}
+				}
+			}
+    	});
     }
     
     public void serializeDownloadQueueNow() {
@@ -208,27 +258,29 @@ public class DownloadServiceLifecycleSupport {
 		state.currentPlayingIndex = downloadService.getCurrentPlayingIndex();
 		state.currentPlayingPosition = downloadService.getPlayerPosition();
 
+		DownloadFile currentPlaying = downloadService.getCurrentPlaying();
+		if(currentPlaying != null) {
+			state.renameCurrent = currentPlaying.isWorkDone() && !currentPlaying.isCompleteFileAvailable();
+		}
+
 		Log.i(TAG, "Serialized currentPlayingIndex: " + state.currentPlayingIndex + ", currentPlayingPosition: " + state.currentPlayingPosition);
 		FileUtil.serialize(downloadService, state, FILENAME_DOWNLOADS_SER);
     }
 
-	private void deserializeDownloadQueue() {
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
-			new DeserializeTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
-		} else {
-			new DeserializeTask().execute();
-		}
-	}
     private void deserializeDownloadQueueNow() {
-       State state = FileUtil.deserialize(downloadService, FILENAME_DOWNLOADS_SER);
+   		State state = FileUtil.deserialize(downloadService, FILENAME_DOWNLOADS_SER, State.class);
         if (state == null) {
             return;
         }
         Log.i(TAG, "Deserialized currentPlayingIndex: " + state.currentPlayingIndex + ", currentPlayingPosition: " + state.currentPlayingPosition);
-        downloadService.restore(state.songs, state.currentPlayingIndex, state.currentPlayingPosition);
 
-        // Work-around: Serialize again, as the restore() method creates a serialization without current playing info.
-        serializeDownloadQueue();
+		// Rename first thing before anything else starts
+		if(state.renameCurrent && state.currentPlayingIndex != -1 && state.currentPlayingIndex < state.songs.size()) {
+			DownloadFile currentPlaying = new DownloadFile(downloadService, state.songs.get(state.currentPlayingIndex), false);
+			currentPlaying.renamePartial();
+		}
+
+        downloadService.restore(state.songs, state.currentPlayingIndex, state.currentPlayingPosition);
     }
 
     private void handleKeyEvent(KeyEvent event) {
@@ -294,24 +346,29 @@ public class DownloadServiceLifecycleSupport {
         private boolean resumeAfterCall;
 
         @Override
-        public void onCallStateChanged(int state, String incomingNumber) {
-            switch (state) {
-                case TelephonyManager.CALL_STATE_RINGING:
-                case TelephonyManager.CALL_STATE_OFFHOOK:
-                    if (downloadService.getPlayerState() == PlayerState.STARTED && !downloadService.isRemoteEnabled()) {
-                        resumeAfterCall = true;
-                        downloadService.pause();
-                    }
-                    break;
-                case TelephonyManager.CALL_STATE_IDLE:
-                    if (resumeAfterCall) {
-                        resumeAfterCall = false;
-                        downloadService.start();
-                    }
-                    break;
-                default:
-                    break;
-            }
+        public void onCallStateChanged(final int state, String incomingNumber) {
+        	eventHandler.post(new Runnable() {
+				@Override
+				public void run() {
+					switch (state) {
+		                case TelephonyManager.CALL_STATE_RINGING:
+		                case TelephonyManager.CALL_STATE_OFFHOOK:
+		                    if (downloadService.getPlayerState() == PlayerState.STARTED && !downloadService.isRemoteEnabled()) {
+		                        resumeAfterCall = true;
+		                        downloadService.pause();
+		                    }
+		                    break;
+		                case TelephonyManager.CALL_STATE_IDLE:
+		                    if (resumeAfterCall) {
+		                        resumeAfterCall = false;
+		                        downloadService.start();
+		                    }
+		                    break;
+		                default:
+		                    break;
+		            }
+				}
+        	});
         }
     }
 
@@ -321,32 +378,6 @@ public class DownloadServiceLifecycleSupport {
         private List<MusicDirectory.Entry> songs = new ArrayList<MusicDirectory.Entry>();
         private int currentPlayingIndex;
         private int currentPlayingPosition;
+		private boolean renameCurrent = false;
     }
-	
-	private class SerializeTask extends AsyncTask<Void, Void, Void> {
-		@Override
-		protected Void doInBackground(Void... params) {
-			if(lock.tryLock()) {
-				try {
-					serializeDownloadQueueNow();
-				} finally {
-					lock.unlock();
-				}
-			}
-			return null;
-		}
-	}
-	private class DeserializeTask extends AsyncTask<Void, Void, Void> {
-		@Override
-		protected Void doInBackground(Void... params) {
-			try {
-				lock.lock();
-				deserializeDownloadQueueNow();
-				setup.set(true);
-			} finally {
-				lock.unlock();
-			}
-			return null;
-		}
-	}
 }
