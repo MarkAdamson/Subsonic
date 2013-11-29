@@ -33,6 +33,7 @@ import github.daneren2005.dsub.domain.MusicDirectory;
 import github.daneren2005.dsub.domain.PlayerState;
 import github.daneren2005.dsub.domain.RemoteControlState;
 import github.daneren2005.dsub.domain.RepeatMode;
+import github.daneren2005.dsub.provider.JukeboxRouteProvider;
 import github.daneren2005.dsub.receiver.MediaButtonIntentReceiver;
 import github.daneren2005.dsub.util.CancellableTask;
 import github.daneren2005.dsub.util.Constants;
@@ -62,6 +63,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.support.v7.media.MediaRouter;
 import android.util.Log;
 import android.support.v4.util.LruCache;
 import java.net.URLEncoder;
@@ -202,6 +204,10 @@ public class DownloadServiceImpl extends Service implements DownloadService {
 		if(prefs.getBoolean(Constants.PREFERENCES_EQUALIZER_ON, false)) {
 			getEqualizerController();
 		}
+
+		MediaRouter mediaRouter = MediaRouter.getInstance(this);
+		JukeboxRouteProvider routeProvider = new JukeboxRouteProvider(this);
+		mediaRouter.addProvider(routeProvider);
     }
 
     @Override

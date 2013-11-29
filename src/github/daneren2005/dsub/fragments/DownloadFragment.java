@@ -832,20 +832,10 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 		// Start MediaRouter API stuff
 		mediaRouter = MediaRouter.getInstance(context);
 
-		// Create custom provider
-		JukeboxRouteProvider routeProvider = new JukeboxRouteProvider(context);
-
-		// Register custom provider
-		mediaRouter.addProvider(routeProvider);
-
 		// Create cast context, get selector
 		castContext = new CastContext(context);
 		MediaRouteHelper.registerMediaRouteProvider(castContext);
 		mediaRouteSelector = MediaRouteHelper.buildMediaRouteSelector(MediaControlIntent.CATEGORY_REMOTE_PLAYBACK);
-
-		// Add custom intent filter to the returned mediaRouteSelector
-		MediaRouteSelector.Builder selectorBuilder = new MediaRouteSelector.Builder(mediaRouteSelector);
-		mediaRouteSelector = selectorBuilder.build();
 
 		mediaRouterCallback = new MediaRouter.Callback() {
 			@Override

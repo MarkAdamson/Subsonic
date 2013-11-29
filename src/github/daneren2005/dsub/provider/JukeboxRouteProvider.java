@@ -29,16 +29,21 @@ import android.support.v7.media.MediaRouteDiscoveryRequest;
 import android.support.v7.media.MediaRouteProvider;
 import android.support.v7.media.MediaRouteProviderDescriptor;
 
+import github.daneren2005.dsub.domain.RemoteControlState;
+import github.daneren2005.dsub.service.DownloadService;
+
 /**
  * Created by Scott on 11/28/13.
  */
 public class JukeboxRouteProvider extends MediaRouteProvider {
+	public static final String CATEGORY_SAMPLE_ROUTE = "github.daneren2005.dsub.SERVER_JUKEBOX";
 	private static int MAX_VOLUME = 10;
 
-	public static final String CATEGORY_SAMPLE_ROUTE = "github.daneren2005.dsub.SERVER_JUKEBOX";
+	private DownloadService downloadService;
 
 	public JukeboxRouteProvider(Context context) {
 		super(context);
+		this.downloadService = (DownloadService) context;
 
 		// Create intents
 		IntentFilter routeIntentFilter = new IntentFilter();
@@ -65,10 +70,16 @@ public class JukeboxRouteProvider extends MediaRouteProvider {
 
 	@Override
 	public MediaRouteProvider.RouteController onCreateRouteController(String routeId) {
-		return new JukeboxRouteController();
+		return new JukeboxRouteController(downloadService);
 	}
 
 	private static class JukeboxRouteController extends RouteController {
+		private DownloadService downloadService;
+
+		public JukeboxRouteController(DownloadService downloadService) {
+			this.downloadService = downloadService;
+		}
+
 		@Override
 		public boolean onControlRequest(Intent intent, android.support.v7.media.MediaRouter.ControlRequestCallback callback) {
 			if (intent.hasCategory(MediaControlIntent.CATEGORY_REMOTE_PLAYBACK)) {
@@ -76,6 +87,21 @@ public class JukeboxRouteProvider extends MediaRouteProvider {
 			} else {
 				return false;
 			}
+		}
+
+		@Override
+		public void onRelease() {
+			downloadService.setRemoteEnabled(RemoteControlState.LOCAL);
+		}
+
+		@Override
+		public void onSelect() {
+			downloadService.setRemoteEnabled(RemoteControlState.JUKEBOX_SERVER);
+		}
+
+		@Override
+		public void onUnselect() {
+			downloadService.setRemoteEnabled(RemoteControlState.LOCAL);
 		}
 	}
 }
