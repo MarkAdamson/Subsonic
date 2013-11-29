@@ -16,6 +16,7 @@ import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.v7.app.MediaRouteButton;
+import android.support.v7.media.MediaControlIntent;
 import android.support.v7.media.MediaRouteDescriptor;
 import android.support.v7.media.MediaRouteProvider;
 import android.support.v7.media.MediaRouteProviderDescriptor;
@@ -65,6 +66,7 @@ import github.daneren2005.dsub.domain.MusicDirectory;
 import github.daneren2005.dsub.domain.PlayerState;
 import github.daneren2005.dsub.domain.RemoteControlState;
 import github.daneren2005.dsub.domain.RepeatMode;
+import github.daneren2005.dsub.provider.JukeboxRouteProvider;
 import github.daneren2005.dsub.service.DownloadFile;
 import github.daneren2005.dsub.service.DownloadService;
 import github.daneren2005.dsub.service.MusicService;
@@ -830,32 +832,19 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 		// Start MediaRouter API stuff
 		mediaRouter = MediaRouter.getInstance(context);
 
-		// Jukebox MediaRoute creation
-		// Create custom route
-		MediaRouteDescriptor.Builder routeBuilder = new MediaRouteDescriptor.Builder("Jukebox Route", "Subsonic Jukebox");
-		IntentFilter routeIntentFilter = new IntentFilter("github.daneren2005.dsub.jukebox");
-		routeBuilder.addControlFilter(routeIntentFilter);
-		routeBuilder.setDescription("Subsonic Jukebox");
-		routeBuilder.setVolume(5);
-		routeBuilder.setVolumeMax(10);
-
 		// Create custom provider
-		MediaRouteProviderDescriptor.Builder providerBuilder = new MediaRouteProviderDescriptor.Builder();
-		providerBuilder.addRoute(routeBuilder.build());
-		// MediaRouteProvider routeProvider = new MediaRouteProvider(context);
-		// routeProvider.setDescriptor(providerBuilder.build());
+		JukeboxRouteProvider routeProvider = new JukeboxRouteProvider(context);
 
 		// Register custom provider
-		// mediaRouter.addProvider(routeProvider);
+		mediaRouter.addProvider(routeProvider);
 
 		// Create cast context, get selector
 		castContext = new CastContext(context);
-		MediaRouteHelper.registerMinimalMediaRouteProvider(castContext, this);
-		mediaRouteSelector = MediaRouteHelper.buildMediaRouteSelector(MediaRouteHelper.CATEGORY_CAST);
+		MediaRouteHelper.registerMediaRouteProvider(castContext);
+		mediaRouteSelector = MediaRouteHelper.buildMediaRouteSelector(MediaControlIntent.CATEGORY_REMOTE_PLAYBACK);
 
 		// Add custom intent filter to the returned mediaRouteSelector
 		MediaRouteSelector.Builder selectorBuilder = new MediaRouteSelector.Builder(mediaRouteSelector);
-		// selectorBuilder.addControlCategory(routeIntentFilter);
 		mediaRouteSelector = selectorBuilder.build();
 
 		mediaRouterCallback = new MediaRouter.Callback() {
