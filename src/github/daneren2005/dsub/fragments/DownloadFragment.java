@@ -9,18 +9,12 @@ import java.util.concurrent.TimeUnit;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.Color;
-import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.v7.app.MediaRouteButton;
 import android.support.v7.media.MediaControlIntent;
-import android.support.v7.media.MediaRouteDescriptor;
-import android.support.v7.media.MediaRouteProvider;
-import android.support.v7.media.MediaRouteProviderDescriptor;
-import android.support.v7.media.MediaRouteProviderService;
 import android.support.v7.media.MediaRouteSelector;
 import android.support.v7.media.MediaRouter;
 import android.support.v7.media.MediaRouter.RouteInfo;
@@ -64,9 +58,7 @@ import github.daneren2005.dsub.R;
 import github.daneren2005.dsub.activity.SubsonicFragmentActivity;
 import github.daneren2005.dsub.domain.MusicDirectory;
 import github.daneren2005.dsub.domain.PlayerState;
-import github.daneren2005.dsub.domain.RemoteControlState;
 import github.daneren2005.dsub.domain.RepeatMode;
-import github.daneren2005.dsub.provider.JukeboxRouteProvider;
 import github.daneren2005.dsub.service.DownloadFile;
 import github.daneren2005.dsub.service.DownloadService;
 import github.daneren2005.dsub.service.MusicService;
@@ -114,7 +106,6 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 	private ImageButton repeatButton;
 	private Button equalizerButton;
 	private Button visualizerButton;
-	private Button jukeboxButton;
 	private View toggleListButton;
 	private ImageButton starButton;
 	private ImageButton bookmarkButton;
@@ -205,7 +196,6 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 		repeatButton = (ImageButton)rootView.findViewById(R.id.download_repeat);
 		equalizerButton = (Button)rootView.findViewById(R.id.download_equalizer);
 		visualizerButton = (Button)rootView.findViewById(R.id.download_visualizer);
-		jukeboxButton = (Button)rootView.findViewById(R.id.download_jukebox);
 		bookmarkButton = (ImageButton) rootView.findViewById(R.id.download_bookmark);
 		LinearLayout visualizerViewLayout = (LinearLayout)rootView.findViewById(R.id.download_visualizer_view_layout);
 		toggleListButton =rootView.findViewById(R.id.download_toggle_list);
@@ -234,7 +224,6 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 		startButton.setOnTouchListener(touchListener);
 		equalizerButton.setOnTouchListener(touchListener);
 		visualizerButton.setOnTouchListener(touchListener);
-		jukeboxButton.setOnTouchListener(touchListener);
 		bookmarkButton.setOnTouchListener(touchListener);
 		emptyTextView.setOnTouchListener(touchListener);
 		albumArtImageView.setOnTouchListener(touchListener);
@@ -402,17 +391,6 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 				} else {
 					Util.toast(context, "Failed to start visualizer.  Try restarting.");
 				}
-				setControlsVisible(true);
-			}
-		});
-
-		jukeboxButton.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View view) {
-				boolean jukeboxEnabled = !getDownloadService().isRemoteEnabled();
-				getDownloadService().setRemoteEnabled(jukeboxEnabled ? RemoteControlState.JUKEBOX_SERVER : RemoteControlState.LOCAL);
-				updateButtons();
-				Util.toast(context, jukeboxEnabled ? R.string.download_jukebox_on : R.string.download_jukebox_off, false);
 				setControlsVisible(true);
 			}
 		});
@@ -911,7 +889,6 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 		}
 
 		boolean jukeboxEnabled = getDownloadService() != null && getDownloadService().isRemoteEnabled();
-		jukeboxButton.setTextColor(jukeboxEnabled ? COLOR_BUTTON_ENABLED : COLOR_BUTTON_DISABLED);
 		
 		if(Util.isOffline(context)) {
 			bookmarkButton.setVisibility(View.GONE);
@@ -1237,7 +1214,6 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 						break;
 				}
 
-				jukeboxButton.setTextColor(isJukeboxEnabled ? COLOR_BUTTON_ENABLED : COLOR_BUTTON_DISABLED);
 				onProgressChangedTask = null;
 			}
 		};
