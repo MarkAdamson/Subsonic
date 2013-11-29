@@ -45,6 +45,8 @@ import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemSelectedListener;
 import android.widget.ArrayAdapter;
@@ -73,6 +75,7 @@ public class SubsonicActivity extends ActionBarActivity implements OnItemSelecte
 	private static final String TAG = SubsonicActivity.class.getSimpleName();
 	private static ImageLoader IMAGE_LOADER;
 	protected static String theme;
+	protected static boolean fullScreen;
 	private String[] drawerItemsDescriptions;
 	private String[] drawerItems;
 	private boolean drawerIdle = true;
@@ -98,6 +101,7 @@ public class SubsonicActivity extends ActionBarActivity implements OnItemSelecte
 		setUncaughtExceptionHandler();
 		applyTheme();
 		super.onCreate(bundle);
+		applyFullscreen();
 		startService(new Intent(this, DownloadServiceImpl.class));
 		setVolumeControlStream(AudioManager.STREAM_MUSIC);
 		
@@ -126,7 +130,7 @@ public class SubsonicActivity extends ActionBarActivity implements OnItemSelecte
 		Util.registerMediaButtonEventReceiver(this);
 
 		// Make sure to update theme
-		if (theme != null && !theme.equals(Util.getTheme(this))) {
+		if (theme != null && !theme.equals(Util.getTheme(this)) || fullScreen != Util.getPreferences(this).getBoolean(Constants.PREFERENCES_KEY_FULL_SCREEN, false)) {
 			restart();
 		}
 		
@@ -166,7 +170,9 @@ public class SubsonicActivity extends ActionBarActivity implements OnItemSelecte
 					startFragmentActivity(drawerItemsDescriptions[position]);
 
 					if(lastSelectedView != view) {
-						lastSelectedView.setBackgroundResource(android.R.color.transparent);
+						if(lastSelectedView != null) {
+							lastSelectedView.setBackgroundResource(android.R.color.transparent);
+						}
 						view.setBackgroundResource(R.color.dividerColor);
 						lastSelectedView = view;
 						lastSelectedPosition = position;
@@ -290,6 +296,11 @@ public class SubsonicActivity extends ActionBarActivity implements OnItemSelecte
 		lastSelectedPosition = savedInstanceState.getInt(Constants.FRAGMENT_POSITION);
 		recreateSpinner();
 	}
+
+	@Override
+	public void onNewIntent(Intent intent) {
+		super.onNewIntent(intent);
+	}
 	
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
@@ -349,31 +360,6 @@ public class SubsonicActivity extends ActionBarActivity implements OnItemSelecte
 	@Override
 	public void onNothingSelected(AdapterView<?> parent) {
 		
-	}
-
-	@Override
-	public void onNewIntent(Intent intent) {
-		super.onNewIntent(intent);
-
-		if(currentFragment != null && currentFragment instanceof SearchFragment) {
-			String query = intent.getStringExtra(Constants.INTENT_EXTRA_NAME_QUERY);
-			boolean autoplay = intent.getBooleanExtra(Constants.INTENT_EXTRA_NAME_AUTOPLAY, false);
-			boolean requestsearch = intent.getBooleanExtra(Constants.INTENT_EXTRA_REQUEST_SEARCH, false);
-
-			if (query != null) {
-				((SearchFragment)currentFragment).search(query, autoplay);
-			} else {
-				((SearchFragment)currentFragment).populateList();
-				if (requestsearch) {
-					onSearchRequested();
-				}
-			}
-		} else if(intent.getStringExtra(Constants.INTENT_EXTRA_NAME_QUERY) != null) {
-			setIntent(intent);
-
-			SearchFragment fragment = new SearchFragment();
-			replaceFragment(fragment, currentFragment.getRootId(), fragment.getSupportTag());
-		}
 	}
 	
 	private void populateDrawer() {
@@ -610,24 +596,36 @@ public class SubsonicActivity extends ActionBarActivity implements OnItemSelecte
 
 	private void applyTheme() {
 		theme = Util.getTheme(this);
+
+		if(theme != null && theme.indexOf("fullscreen") != -1) {
+			theme = theme.substring(0, theme.indexOf("_fullscreen"));
+			Util.setTheme(this, theme);
+		}
+		
 		if ("dark".equals(theme)) {
 			setTheme(R.style.Theme_DSub_Dark);
 		} else if ("black".equals(theme)) {
 			setTheme(R.style.Theme_DSub_Black);
 		} else if ("light".equals(theme)) {
 			setTheme(R.style.Theme_DSub_Light);
-		} else if ("dark_fullscreen".equals(theme)) {
-			setTheme(R.style.Theme_DSub_Dark_Fullscreen);
-		} else if ("black_fullscreen".equals(theme)) {
-			setTheme(R.style.Theme_DSub_Black_Fullscreen);
-		} else if ("light_fullscreen".equals(theme)) {
-			setTheme(R.style.Theme_DSub_Light_Fullscreen);
-		} else if("holo".equals(theme)) {
+		} else {
 			setTheme(R.style.Theme_DSub_Holo);
-		} else if("holo_fullscreen".equals(theme)) {
-			setTheme(R.style.Theme_DSub_Holo_Fullscreen);
-		}else {
-			setTheme(R.style.Theme_DSub_Holo);
+		}
+	}
+	private void applyFullscreen() {
+		fullScreen = Util.getPreferences(this).getBoolean(Constants.PREFERENCES_KEY_FULL_SCREEN, false);
+		if(fullScreen) {
+			// Hide additional elements on higher Android versions
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+				int flags = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
+					View.SYSTEM_UI_FLAG_FULLSCREEN |
+					View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+
+				getWindow().getDecorView().setSystemUiVisibility(flags);
+			} else if(Build.VERSION.SDK_INT < Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
+				getWindow().requestFeature(Window.FEATURE_NO_TITLE);
+			}
+			getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
 		}
 	}
 

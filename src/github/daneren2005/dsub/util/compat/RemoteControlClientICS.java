@@ -1,6 +1,7 @@
 package github.daneren2005.dsub.util.compat;
 
 import github.daneren2005.dsub.domain.MusicDirectory;
+import github.daneren2005.dsub.service.DownloadServiceImpl;
 import github.daneren2005.dsub.util.ImageLoader;
 import android.annotation.TargetApi;
 import android.app.PendingIntent;
@@ -10,17 +11,21 @@ import android.content.Intent;
 import android.media.AudioManager;
 import android.media.MediaMetadataRetriever;
 import android.media.RemoteControlClient;
+import android.util.Log;
+
 import github.daneren2005.dsub.activity.SubsonicActivity;
 import github.daneren2005.dsub.service.DownloadService;
 
 @TargetApi(14)
 public class RemoteControlClientICS extends RemoteControlClientHelper {
+	private static String TAG = RemoteControlClientICS.class.getSimpleName();
+
 	protected RemoteControlClient mRemoteControl;
 	protected ImageLoader imageLoader;
-	protected DownloadService downloadService;
+	protected DownloadServiceImpl downloadService;
 	
 	public void register(final Context context, final ComponentName mediaButtonReceiverComponent) {
-		downloadService = (DownloadService) context;
+		downloadService = (DownloadServiceImpl) context;
 		AudioManager audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
 
 		// build the PendingIntent for the remote control client
@@ -54,17 +59,9 @@ public class RemoteControlClientICS extends RemoteControlClientHelper {
 		}
 		
 		// Update the remote controls
-    	mRemoteControl.editMetadata(true)
-    	.putString(MediaMetadataRetriever.METADATA_KEY_ARTIST, (currentSong == null) ? null : currentSong.getArtist())
-    	.putString(MediaMetadataRetriever.METADATA_KEY_ALBUM, (currentSong == null) ? null : currentSong.getAlbum())
-    	.putString(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST, (currentSong == null) ? null : currentSong.getArtist())
-    	.putString(MediaMetadataRetriever.METADATA_KEY_TITLE, (currentSong) == null ? null : currentSong.getTitle())
-    	.putString(MediaMetadataRetriever.METADATA_KEY_GENRE, (currentSong) == null ? null : currentSong.getGenre())
-    	.putLong(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER, (currentSong == null) ? 
-    			0 : ((currentSong.getTrack() == null) ? 0 : currentSong.getTrack()))
-    	.putLong(MediaMetadataRetriever.METADATA_KEY_DURATION, (currentSong == null) ? 
-    			0 : ((currentSong.getDuration() == null) ? 0 : currentSong.getDuration()))
-    	.apply();
+		RemoteControlClient.MetadataEditor editor = mRemoteControl.editMetadata(true);
+		updateMetadata(currentSong, editor);
+		editor.apply();
     	if (currentSong == null || imageLoader == null) {
     		mRemoteControl.editMetadata(true)
         	.putBitmap(RemoteControlClient.MetadataEditor.BITMAP_KEY_ARTWORK, null)
@@ -72,6 +69,17 @@ public class RemoteControlClientICS extends RemoteControlClientHelper {
     	} else {
     		imageLoader.loadImage(context, mRemoteControl, currentSong);
     	}
+	}
+	protected void updateMetadata(final MusicDirectory.Entry currentSong, final RemoteControlClient.MetadataEditor editor) {
+		editor.putString(MediaMetadataRetriever.METADATA_KEY_ARTIST, (currentSong == null) ? null : currentSong.getArtist())
+			.putString(MediaMetadataRetriever.METADATA_KEY_ALBUM, (currentSong == null) ? null : currentSong.getAlbum())
+			.putString(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST, (currentSong == null) ? null : currentSong.getArtist())
+			.putString(MediaMetadataRetriever.METADATA_KEY_TITLE, (currentSong) == null ? null : currentSong.getTitle())
+			.putString(MediaMetadataRetriever.METADATA_KEY_GENRE, (currentSong) == null ? null : currentSong.getGenre())
+			.putLong(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER, (currentSong == null) ? 
+				0 : ((currentSong.getTrack() == null) ? 0 : currentSong.getTrack()))
+			.putLong(MediaMetadataRetriever.METADATA_KEY_DURATION, (currentSong == null) ? 
+				0 : ((currentSong.getDuration() == null) ? 0 : (currentSong.getDuration() * 1000)));
 	}
 	
 	protected int getTransportFlags() {

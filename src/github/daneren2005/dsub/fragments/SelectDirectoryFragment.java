@@ -196,6 +196,9 @@ public class SelectDirectoryFragment extends SubsonicFragment implements Adapter
 			case R.id.menu_play_last:
 				playNow(false, true);
 				return true;
+			case R.id.menu_play_next:
+				playNow(false, true, true);
+				return true;
 			case R.id.menu_shuffle:
 				playNow(true, false);
 				return true;
@@ -368,6 +371,12 @@ public class SelectDirectoryFragment extends SubsonicFragment implements Adapter
 			protected MusicDirectory load(MusicService service) throws Exception {
 				return service.getMusicDirectory(id, name, refresh, context, this);
 			}
+			
+			@Override
+			protected void done(Pair<MusicDirectory, Boolean> result) {
+				super.done(result);
+				setTitle(result.getFirst().getName());
+			}
 		}.execute();
 	}
 
@@ -486,14 +495,17 @@ public class SelectDirectoryFragment extends SubsonicFragment implements Adapter
 
         Bundle args = getArguments();
         boolean playAll = args.getBoolean(Constants.INTENT_EXTRA_NAME_AUTOPLAY, false);
-        if (playAll && songCount > 0) {
+        if (playAll) {
             playAll(args.getBoolean(Constants.INTENT_EXTRA_NAME_SHUFFLE, false), false);
         }
     }
 
 	private void playNow(final boolean shuffle, final boolean append) {
+		playNow(shuffle, append, false);
+	}
+	private void playNow(final boolean shuffle, final boolean append, final boolean playNext) {
 		if(getSelectedSongs().size() > 0) {
-			download(append, false, !append, false, shuffle);
+			download(append, false, !append, playNext, shuffle);
 			selectAll(false, false);
 		}
 		else {

@@ -30,6 +30,12 @@
 				android:defaultValue="holo"
 				android:entryValues="@array/themeValues"
 				android:entries="@array/themeNames"/>
+				
+			<CheckBoxPreference
+				android:title="@string/settings.theme_fullscreen"
+				android:summary="@string/settings.theme_fullscreen_summary"
+				android:key="fullScreen"
+				android:defaultValue="false"/>
 
 			<CheckBoxPreference
 				android:title="@string/settings.track_title"
@@ -42,6 +48,12 @@
 				android:summary="@string/settings.hide_widget_summary"
 				android:key="hideWidget"
 				android:defaultValue="false"/>
+
+			<CheckBoxPreference
+				android:title="@string/settings.custom_sort"
+				android:summary="@string/settings.custom_sort_summary"
+				android:key="customSortEnabled"
+				android:defaultValue="true"/>
 
 		</PreferenceCategory>
 
@@ -160,6 +172,29 @@
 		</PreferenceCategory>
 
 		<PreferenceCategory
+			android:title="@string/settings.sync_title">
+
+			<CheckBoxPreference
+				android:title="@string/settings.sync_enabled"
+				android:summary="@string/settings.sync_enabled_summary"
+				android:key="syncEnabled"
+				android:defaultValue="true"/>
+
+			<ListPreference
+				android:title="@string/settings.sync_interval"
+				android:key="syncInterval"
+				android:defaultValue="60"
+				android:entryValues="@array/syncIntervalValues"
+				android:entries="@array/syncIntervalNames"/>
+
+			<CheckBoxPreference
+				android:title="@string/settings.sync_wifi"
+				android:summary="@string/settings.sync_wifi_summary"
+				android:key="syncWifi"
+				android:defaultValue="true"/>
+		</PreferenceCategory>
+
+		<PreferenceCategory
 			android:title="@string/settings.other_title">
 
 			<CheckBoxPreference
@@ -173,11 +208,6 @@
 				android:summary="@string/settings.screen_lit_summary"
 				android:key="screenLitOnDownload"
 				android:defaultValue="true"/>
-
-			<Preference
-				android:key="clearSearchHistory"
-				android:title="@string/settings.clear_search_history"
-				android:persistent="false"/>
 		</PreferenceCategory>
 	</PreferenceScreen>
 

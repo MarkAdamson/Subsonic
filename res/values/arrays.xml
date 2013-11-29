@@ -45,10 +45,6 @@
         <item>dark</item>
 		<item>black</item>
 		<item>holo</item>
-		<item>light_fullscreen</item>
-		<item>dark_fullscreen</item>
-		<item>black_fullscreen</item>
-		<item>holo_fullscreen</item>
     </string-array>
 
     <string-array name="themeNames">
@@ -56,10 +52,6 @@
         <item>@string/settings.theme_dark</item>
 		<item>@string/settings.theme_black</item>
 		<item>@string/settings.theme_holo</item>
-		<item>@string/settings.theme_light_fullscreen</item>
-        <item>@string/settings.theme_dark_fullscreen</item>
-		<item>@string/settings.theme_black_fullscreen</item>
-		<item>@string/settings.theme_holo_fullscreen</item>
     </string-array>
 	
 	<string-array name="sleepTimerValues">
@@ -200,6 +192,27 @@
 		<item>@string/settings.video_hls</item>
 		<item>@string/settings.video_transcode</item>
 		<item>@string/settings.video_flash</item>
+	</string-array>
+
+	<string-array name="syncIntervalValues">
+		<item>15</item>
+		<item>30</item>
+		<item>60</item>
+		<item>120</item>
+		<item>240</item>
+		<item>360</item>
+		<item>720</item>
+		<item>1440</item>
+	</string-array>
+	<string-array name="syncIntervalNames">
+		<item>15 Minutes</item>
+		<item>30 Minutes</item>
+		<item>1 Hour</item>
+		<item>2 Hours</item>
+		<item>3 Hours</item>
+		<item>6 Hours</item>
+		<item>12 Hours</item>
+		<item>Daily</item>
 	</string-array>
 
 </resources>

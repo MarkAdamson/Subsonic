@@ -108,7 +108,7 @@ public class SearchFragment extends SubsonicFragment {
 				} else {
 					Object item = parent.getItemAtPosition(position);
 					if (item instanceof Artist) {
-						onArtistSelected((Artist) item);
+						onArtistSelected((Artist) item, false);
 					} else if (item instanceof MusicDirectory.Entry) {
 						MusicDirectory.Entry entry = (MusicDirectory.Entry) item;
 						if (entry.isDirectory()) {
@@ -182,9 +182,11 @@ public class SearchFragment extends SubsonicFragment {
 	@Override
 	public void setPrimaryFragment(boolean primary) {
 		super.setPrimaryFragment(primary);
-		if(rootView != null && primary) {
-			context.onNewIntent(context.getIntent());
-		}
+	}
+
+	@Override
+	public void refresh(boolean refresh) {
+		context.onNewIntent(context.getIntent());
 	}
 
 	public void search(final String query, final boolean autoplay) {
@@ -208,7 +210,7 @@ public class SearchFragment extends SubsonicFragment {
 				searchResult = result;
 				populateList();
 				if (autoplay) {
-					autoplay();
+					autoplay(query);
 				}
 
 			}
@@ -289,11 +291,14 @@ public class SearchFragment extends SubsonicFragment {
 		mergeAdapter.notifyDataSetChanged();
 	}
 
-	private void onArtistSelected(Artist artist) {
+	private void onArtistSelected(Artist artist, boolean autoplay) {
 		SubsonicFragment fragment = new SelectDirectoryFragment();
 		Bundle args = new Bundle();
 		args.putString(Constants.INTENT_EXTRA_NAME_ID, artist.getId());
 		args.putString(Constants.INTENT_EXTRA_NAME_NAME, artist.getName());
+		if(autoplay) {
+			args.putBoolean(Constants.INTENT_EXTRA_NAME_AUTOPLAY, true);
+		}
 		fragment.setArguments(args);
 
 		replaceFragment(fragment, R.id.fragment_list_layout);
@@ -317,6 +322,9 @@ public class SearchFragment extends SubsonicFragment {
 		args = new Bundle();
 		args.putString(Constants.INTENT_EXTRA_NAME_ID, album.getId());
 		args.putString(Constants.INTENT_EXTRA_NAME_NAME, album.getTitle());
+		if(autoplay) {
+			args.putBoolean(Constants.INTENT_EXTRA_NAME_AUTOPLAY, true);
+		}
 		fragment.setArguments(args);
 
 		replaceFragment(fragment, id);
@@ -345,11 +353,19 @@ public class SearchFragment extends SubsonicFragment {
 		startActivity(intent);
 	}
 
-	private void autoplay() {
-		if (!searchResult.getSongs().isEmpty()) {
-			onSongSelected(searchResult.getSongs().get(0), false, false, true, false);
-		} else if (!searchResult.getAlbums().isEmpty()) {
-			onAlbumSelected(searchResult.getAlbums().get(0), true);
+	private void autoplay(String query) {
+		Artist artist = searchResult.getArtists().isEmpty() ? null : searchResult.getArtists().get(0);
+		MusicDirectory.Entry album = searchResult.getAlbums().isEmpty() ? null : searchResult.getAlbums().get(0); 
+		MusicDirectory.Entry song = searchResult.getSongs().isEmpty() ? null : searchResult.getSongs().get(0);
+		
+		if(artist != null && query.equals(artist.getName())) {
+			onArtistSelected(artist, true);
+		} else if(album != null && query.equals(album.getTitle())) {
+			onAlbumSelected(album, true);
+		} else if(song != null) {
+			onSongSelected(song, false, false, true, false);
+		} else if(album != null) {
+			onAlbumSelected(album, true);
 		}
 	}
 }
