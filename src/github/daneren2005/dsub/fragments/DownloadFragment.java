@@ -812,8 +812,12 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 
 		// Create cast context, get selector
 		castContext = new CastContext(context);
-		MediaRouteHelper.registerMediaRouteProvider(castContext);
-		mediaRouteSelector = MediaRouteHelper.buildMediaRouteSelector(MediaControlIntent.CATEGORY_REMOTE_PLAYBACK);
+		MediaRouteHelper.registerMinimalMediaRouteProvider(castContext, this);
+		mediaRouteSelector = MediaRouteHelper.buildMediaRouteSelector(MediaRouteHelper.CATEGORY_CAST);
+
+		MediaRouteSelector.Builder builder = new MediaRouteSelector.Builder(mediaRouteSelector);
+		builder.addControlCategory(MediaControlIntent.CATEGORY_REMOTE_PLAYBACK);
+		mediaRouteSelector = builder.build();
 
 		mediaRouterCallback = new MediaRouter.Callback() {
 			@Override
@@ -827,7 +831,7 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 					try {
 						applicationSession.endSession();
 					} catch(Exception e) {
-						// TODO: What does this mean?
+						Log.w(TAG, "Error closing application session", e);
 					}
 					applicationSession = null;
 				}
@@ -1413,7 +1417,7 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 				if (!applicationSession.hasChannel()) {
 					return;
 				}
-				
+
 				ApplicationChannel channel = applicationSession.getChannel();
 				messageStream = new MediaProtocolMessageStream();
 				channel.attachMessageStream(messageStream);
@@ -1443,7 +1447,7 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 		try {
 			applicationSession.startSession(applicationName);
 		} catch(Exception e) {
-			// TODO: Handle death
+			Log.w(TAG, "Error starting application session", e);
 		}
 	}
 

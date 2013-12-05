@@ -18,7 +18,12 @@ package github.daneren2005.dsub.service;
 import android.os.Handler;
 import android.util.Log;
 
+import com.google.cast.ContentMetadata;
+import com.google.cast.MediaProtocolCommand;
+import com.google.cast.MediaProtocolMessageStream;
+
 import github.daneren2005.dsub.R;
+import github.daneren2005.dsub.domain.MusicDirectory;
 import github.daneren2005.dsub.domain.RemoteStatus;
 import github.daneren2005.dsub.domain.PlayerState;
 import github.daneren2005.dsub.domain.RemoteControlState;
@@ -53,15 +58,23 @@ public class ChromeCastController extends RemoteController {
 
 	@Override
 	public void start() {
-		messageStream.play();
+		try {
+			messageStream.play();
+		} catch(Exception e) {
+
+		}
 	}
 	@Override
 	public void stop() {
-		messageStream.stop();
+		try {
+			messageStream.stop();
+		} catch(Exception e) {
+
+		}
 	}
 	@Override
 	public void shutdown() {
-		running = false;
+
 	}
 	
 	@Override
@@ -73,7 +86,11 @@ public class ChromeCastController extends RemoteController {
 	}
 	@Override
 	public void changePosition(int seconds) {
-		messageStream.playFrom(seconds);
+		try {
+			messageStream.playFrom(seconds);
+		} catch(Exception e) {
+
+		}
 	}
 	@Override
 	public void changeTrack(int index, DownloadFile songFile) {
@@ -83,19 +100,23 @@ public class ChromeCastController extends RemoteController {
 		metadata.setTitle(song.getTitle());
 		// TODO: Setup image id as URI
 		// metadata.setImageUrl();
-		
-		MediaProtocolCommand cmd = messageStream.loadMedia(song.getId(), metadata);
-		cmd.setListener(new MediaProtocolCommand.Listener() {
-			@Override
-			public void onCompleted(MediaProtocolCommand mPCommand) {
-				start();
-			}
-			
-			@Override
-			public void onCancelled(MediaProtocolCommand mPCommand) {
-				
-			}
-		});
+
+		try {
+			MediaProtocolCommand cmd = messageStream.loadMedia(song.getId(), metadata);
+			cmd.setListener(new MediaProtocolCommand.Listener() {
+				@Override
+				public void onCompleted(MediaProtocolCommand mPCommand) {
+					start();
+				}
+
+				@Override
+				public void onCancelled(MediaProtocolCommand mPCommand) {
+
+				}
+			});
+		} catch(Exception e) {
+
+		}
 	}
 	@Override
 	public void setVolume(boolean up) {
@@ -105,7 +126,11 @@ public class ChromeCastController extends RemoteController {
 		gain = Math.min(gain, 1.0f);
 		
 		getVolumeToast().setVolume(gain);
-		messageStream.setVolume(gain);
+		try {
+			messageStream.setVolume(gain);
+		} catch(Exception e) {
+
+		}
 	}
 	
 	@Override
