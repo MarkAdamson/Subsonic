@@ -1,10 +1,7 @@
 package github.daneren2005.dsub.fragments;
 
-import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
-import android.support.v4.app.FragmentTransaction;
 import android.util.Log;
 import android.view.ContextMenu;
 import android.view.LayoutInflater;
@@ -69,7 +66,7 @@ public class SelectArtistFragment extends SubsonicFragment implements AdapterVie
 
 		artistList = (ListView) rootView.findViewById(R.id.fragment_list);
 		artistList.setOnItemClickListener(this);
-		if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+		if(Build.VERSION.SDK_INT == Build.VERSION_CODES.KITKAT) {
 			artistList.setFastScrollAlwaysVisible(true);
 		}
 
@@ -110,9 +107,6 @@ public class SelectArtistFragment extends SubsonicFragment implements AdapterVie
 	@Override
 	public void onCreateContextMenu(ContextMenu menu, View view, ContextMenu.ContextMenuInfo menuInfo) {
 		super.onCreateContextMenu(menu, view, menuInfo);
-		if(!primaryFragment) {
-			return;
-		}
 
 		AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) menuInfo;
 		Object entry = artistList.getItemAtPosition(info.position);
@@ -136,11 +130,13 @@ public class SelectArtistFragment extends SubsonicFragment implements AdapterVie
 			}
 			menu.setGroupCheckable(MENU_GROUP_MUSIC_FOLDER, true, true);
 		}
+
+		recreateContextMenu(menu);
 	}
 
 	@Override
 	public boolean onContextItemSelected(MenuItem menuItem) {
-		if(!primaryFragment) {
+		if(menuItem.getGroupId() != getSupportTag()) {
 			return false;
 		}
 
@@ -173,7 +169,6 @@ public class SelectArtistFragment extends SubsonicFragment implements AdapterVie
 			args.putString(Constants.INTENT_EXTRA_NAME_ID, artist.getId());
 			args.putString(Constants.INTENT_EXTRA_NAME_NAME, artist.getName());
 			if("root".equals(artist.getId())) {
-				Log.d(TAG, "root");
 				args.putSerializable(Constants.FRAGMENT_LIST, (Serializable) entries);
 			}
 			fragment.setArguments(args);

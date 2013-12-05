@@ -31,6 +31,7 @@ import github.daneren2005.dsub.audiofx.VisualizerController;
 import github.daneren2005.dsub.domain.Bookmark;
 import github.daneren2005.dsub.domain.MusicDirectory;
 import github.daneren2005.dsub.domain.PlayerState;
+import github.daneren2005.dsub.domain.PodcastEpisode;
 import github.daneren2005.dsub.domain.RemoteControlState;
 import github.daneren2005.dsub.domain.RepeatMode;
 import github.daneren2005.dsub.provider.JukeboxRouteProvider;
@@ -266,6 +267,7 @@ public class DownloadServiceImpl extends Service implements DownloadService {
 			remoteController.shutdown();
 		}
 		Util.hidePlayingNotification(this, this, handler);
+		Util.hideDownloadingNotification(this);
     }
 
     public static DownloadService getInstance() {
@@ -514,6 +516,17 @@ public class DownloadServiceImpl extends Service implements DownloadService {
     }
 
     public synchronized void clear(boolean serialize) {
+    	// Delete podcast if fully listened to
+    	if(currentPlaying != null && currentPlaying.getSong() instanceof PodcastEpisode) {
+			int duration = getPlayerDuration();
+
+    		// Make sure > 95% of the way through
+    		int cutoffPoint = (int)(duration * 0.95);
+    		if(duration > 0 && cachedPosition > cutoffPoint) {
+    			currentPlaying.delete();
+    		}
+    	}
+    	
         reset();
         downloadList.clear();
         revision++;
@@ -1083,6 +1096,13 @@ public class DownloadServiceImpl extends Service implements DownloadService {
 			if (currentDownloading != null) {
 				currentDownloading.cancelDownload();
 			}
+		}
+		
+		SharedPreferences prefs = Util.getPreferences(this);
+		if(currentPlaying != null && prefs.getBoolean(Constants.PREFERENCES_KEY_PERSISTENT_NOTIFICATION, false)) {
+			Util.showPlayingNotification(this, this, handler, currentPlaying.getSong());
+		} else {
+			Util.hidePlayingNotification(this, this, handler);
 		}
 	}
 
