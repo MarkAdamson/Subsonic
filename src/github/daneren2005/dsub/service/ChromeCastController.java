@@ -37,44 +37,27 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class ChromeCastController extends RemoteController {
 	private static final String TAG = ChromeCastController.class.getSimpleName();
-	private static final long STATUS_UPDATE_INTERVAL_SECONDS = 5L;
 	
-	private final Handler handler;
-	private boolean running = false;
-	private final TaskQueue tasks = new TaskQueue();
-	private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-	private ScheduledFuture<?> statusUpdateFuture;
-	private final AtomicLong timeOfLastUpdate = new AtomicLong();
-	private RemoteStatus remoteStatus;
+	private MediaProtocolMessageStream messageStream;
+	
+	private DownloadFile currentPlaying;
 	private float gain = 0.5f;
     
-    public ChromeCastController(DownloadServiceImpl downloadService, Handler handler) {
-    	this.downloadService = downloadService;
-		this.handler = handler;
-        new Thread() {
-            @Override
-            public void run() {
-				running = true;
-                processTasks();
-            }
-        }.start();
-    }
+	public ChromeCastController(DownloadServiceImpl downloadService, Handler handler) {
+		this.downloadService = downloadService;
+		messageStream = new MediaProtocolMessageStream();
+		
+		DownloadFile currentPlaying = downloadService.getCurrentPlaying();
+		changeTrack(0, currentPlaying);
+	}
 
 	@Override
 	public void start() {
-		tasks.remove(Stop.class);
-		tasks.remove(Start.class);
-		
-		startStatusUpdate();
-		tasks.add(new Start());
+		messageStream.play();
 	}
 	@Override
 	public void stop() {
-		tasks.remove(Stop.class);
-		tasks.remove(Start.class);
-		
-		stopStatusUpdate();
-		tasks.add(new Stop());
+		messageStream.stop();
 	}
 	@Override
 	public void shutdown() {
@@ -83,30 +66,36 @@ public class ChromeCastController extends RemoteController {
 	
 	@Override
 	public void updatePlaylist() {
-	
+		DownloadFile currentPlaying = downloadService.getCurrentPlaying();
+		if(this.currentPlaying != currentPlaying) {
+			changeTrack(0, currentPlaying);
+		}
 	}
 	@Override
 	public void changePosition(int seconds) {
-		tasks.remove(Skip.class);
-		tasks.remove(Stop.class);
-		tasks.remove(Start.class);
-		
-		startStatusUpdate();
-		if (remoteStatus != null) {
-			remoteStatus.setPositionSeconds(seconds);
-		}
-		tasks.add(new Skip(downloadService.getCurrentPlayingIndex(), seconds));
-		downloadService.setPlayerState(PlayerState.STARTED);
+		messageStream.playFrom(seconds);
 	}
 	@Override
-	public void changeTrack(int index, DownloadFile song) {
-		tasks.remove(Skip.class);
-		tasks.remove(Stop.class);
-		tasks.remove(Start.class);
+	public void changeTrack(int index, DownloadFile songFile) {
+		currentPlaying = songFile;
+		MusicDirectory.Entry song = songFile.getSong();
+		ContentMetadata metadata = new ContentMetadata();
+		metadata.setTitle(song.getTitle());
+		// TODO: Setup image id as URI
+		// metadata.setImageUrl();
 		
-		startStatusUpdate();
-		tasks.add(new Skip(index, 0));
-		downloadService.setPlayerState(PlayerState.STARTED);
+		MediaProtocolCommand cmd = messageStream.loadMedia(song.getId(), metadata);
+		cmd.setListener(new MediaProtocolCommand.Listener() {
+			@Override
+			public void onCompleted(MediaProtocolCommand mPCommand) {
+				start();
+			}
+			
+			@Override
+			public void onCancelled(MediaProtocolCommand mPCommand) {
+				
+			}
+		});
 	}
 	@Override
 	public void setVolume(boolean up) {
@@ -116,72 +105,16 @@ public class ChromeCastController extends RemoteController {
 		gain = Math.min(gain, 1.0f);
 		
 		getVolumeToast().setVolume(gain);
-		tasks.remove(SetGain.class);
-		tasks.add(new SetGain(gain));
+		messageStream.setVolume(gain);
 	}
 	
 	@Override
 	public int getRemotePosition() {
-		if (remoteStatus == null || remoteStatus.getPositionSeconds() == null || timeOfLastUpdate.get() == 0) {
-			return 0;
-		}
-		
-		if (remoteStatus.isPlaying()) {
-			int secondsSinceLastUpdate = (int) ((System.currentTimeMillis() - timeOfLastUpdate.get()) / 1000L);
-			return remoteStatus.getPositionSeconds() + secondsSinceLastUpdate;
-		}
-		
-		return remoteStatus.getPositionSeconds();
+		return 0;
 	}
 	
-	private void processTasks() {
-		while (running) {
-			RemoteTask task = null;
-			try {
-				task = tasks.take();
-				RemoteStatus status = task.execute();
-				if(status != null && running) {
-					onStatusUpdate(status);
-				}
-			} catch (Throwable x) {
-				onError(task, x);
-			}
-		}
-	}
-	
-	private synchronized void startStatusUpdate() {
-		stopStatusUpdate();
-		Runnable updateTask = new Runnable() {
-		@Override
-			public void run() {
-				tasks.remove(GetStatus.class);
-				tasks.add(new GetStatus());
-			}
-		};
-		statusUpdateFuture = executorService.scheduleWithFixedDelay(updateTask, STATUS_UPDATE_INTERVAL_SECONDS,
-			STATUS_UPDATE_INTERVAL_SECONDS, TimeUnit.SECONDS);
-	}
-	
-	private synchronized void stopStatusUpdate() {
-		if (statusUpdateFuture != null) {
-			statusUpdateFuture.cancel(false);
-			statusUpdateFuture = null;
-		}
-	}
-    
-	private void onStatusUpdate(RemoteStatus remoteStatus) {
-		timeOfLastUpdate.set(System.currentTimeMillis());
-		this.remoteStatus = remoteStatus;
-		
-		// Track change?
-		Integer index = remoteStatus.getCurrentPlayingIndex();
-		if (index != null && index != -1 && index != downloadService.getCurrentPlayingIndex()) {
-			downloadService.setPlayerState(PlayerState.COMPLETED);
-			downloadService.setCurrentPlaying(index, true);
-			if(remoteStatus.isPlaying()) {
-				downloadService.setPlayerState(PlayerState.STARTED);
-			}
-		}
+	public MediaProtocolMessageStream getMessageStream() {
+		return messageStream;
 	}
 
 	private void onError(RemoteTask task, Throwable x) {
@@ -190,61 +123,5 @@ public class ChromeCastController extends RemoteController {
 	
 	private MusicService getMusicService() {
 		return MusicServiceFactory.getMusicService(downloadService);
-	}
-
-	private class GetStatus extends RemoteTask {
-		@Override
-		RemoteStatus execute() throws Exception {
-			
-		}
-	}
-
-	private class Skip extends RemoteTask {
-		private final int index;
-		private final int offsetSeconds;
-		
-		Skip(int index, int offsetSeconds) {
-			this.index = index;
-			this.offsetSeconds = offsetSeconds;
-		}
-		
-		@Override
-		RemoteStatus execute() throws Exception {
-			
-		}
-	}
-
-	private class Stop extends RemoteTask {
-		@Override
-		RemoteStatus execute() throws Exception {
-			
-		}
-	}
-
-	private class Start extends RemoteTask {
-		@Override
-		RemoteStatus execute() throws Exception {
-			
-		}
-	}
-
-	private class SetGain extends RemoteTask {
-		private final float gain;
-		
-		private SetGain(float gain) {
-			this.gain = gain;
-		}
-		
-		@Override
-		RemoteStatus execute() throws Exception {
-			
-		}
-	}
-
-	private class ShutdownTask extends RemoteTask {
-		@Override
-		RemoteStatus execute() throws Exception {
-			return null;
-		}
 	}
 }
