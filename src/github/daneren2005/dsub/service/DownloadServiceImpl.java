@@ -128,6 +128,7 @@ public class DownloadServiceImpl extends Service implements DownloadService {
     private RemoteControlState remoteState = RemoteControlState.LOCAL;
 	private PositionCache positionCache;
 	private StreamProxy proxy;
+	private SurfaceView surfaceView;
 	
 	private Timer sleepTimer;
 	private int timerDuration;
@@ -271,6 +272,18 @@ public class DownloadServiceImpl extends Service implements DownloadService {
     @Override
     public IBinder onBind(Intent intent) {
         return binder;
+    }
+    
+    @Override
+    public synchronized void setSurfaceView(SurfaceView s) {
+    	boolean isVideo = currentPlaying.getSong().isVideo();
+    	if(s == null && isVideo) {
+    		mediaPlayer.setSurface(null);
+    	}
+    	surfaceView = s;
+    	if(surfaceView != null && isVideo) {
+    		mediaPlayer.setSurface(s.getHolder().getSurface());
+    	}
     }
 
 	@Override
@@ -1131,7 +1144,13 @@ public class DownloadServiceImpl extends Service implements DownloadService {
 			setPlayerState(IDLE);
 			mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
 			String dataSource = file.getPath();
-			if(isPartial) {
+			if(downloadFile.getSong().isVideo()) {
+				// Get the HLS url
+				MusicService service = MusicServiceFactory.getMusicService(this);
+				int maxBitrate = Util.getMaxVideoBitrate(context);
+				dataSource = service.getHlsUrl(downloadFile.getSong().getId(), maxBitrate, this);
+			}
+			else if(isPartial) {
 				if (proxy == null) {
 					proxy = new StreamProxy(this);
 					proxy.start();
@@ -1201,6 +1220,10 @@ public class DownloadServiceImpl extends Service implements DownloadService {
             	nextMediaPlayer.reset();
             	nextMediaPlayer.release();
             	nextMediaPlayer = null;
+            }
+            // Don't try to setup next video
+            if(downloadFile.getSong().isVideo()) {
+            	return;
             }
             nextMediaPlayer = new MediaPlayer();
 			nextMediaPlayer.setWakeMode(DownloadServiceImpl.this, PowerManager.PARTIAL_WAKE_LOCK);
@@ -1402,8 +1425,10 @@ public class DownloadServiceImpl extends Service implements DownloadService {
             }
 
             currentDownloading = currentPlaying;
-            currentDownloading.download();
-            cleanupCandidates.add(currentDownloading);
+            if(!currentDownloading.getSong().isVideo()) {
+            	currentDownloading.download();
+            	cleanupCandidates.add(currentDownloading);
+            }
         }
 
         // Find a suitable target for download.
@@ -1421,7 +1446,7 @@ public class DownloadServiceImpl extends Service implements DownloadService {
 				int i = start;
 				do {
 					DownloadFile downloadFile = downloadList.get(i);
-					if (!downloadFile.isWorkDone() && !downloadFile.isFailedMax()) {
+					if (!downloadFile.isWorkDone() && !downloadFile.isFailedMax() && !downloadFile.getSong().isVideo()) {
 						if (downloadFile.shouldSave() || preloaded < Util.getPreloadCount(this)) {
 							currentDownloading = downloadFile;
 							currentDownloading.download();
