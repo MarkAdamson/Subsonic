@@ -28,6 +28,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.media.MediaMetadataRetriever;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.util.Log;
@@ -938,6 +939,8 @@ public class SubsonicFragment extends Fragment {
 	protected void playVideo(MusicDirectory.Entry entry) {
 		if(entryExists(entry)) {
 			playExternalPlayer(entry);
+		} else if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
+			streamIntervalPlayer(entry);
 		} else {
 			streamExternalPlayer(entry);
 		}
@@ -966,6 +969,18 @@ public class SubsonicFragment extends Fragment {
 				Util.toast(context, R.string.download_no_streaming_player);
 			}
 		}
+	}
+	protected void streamInternalPlayer(MusicDirectory.Entry entry) {
+		if(getDownloadService() == null) {
+			return;
+		}
+		
+		List<MusicDirectory.Entry> songs = new ArrayList<MusicDirectory.Entry>(1);
+		songs.add(entry);
+		
+		getDownloadService().clear();
+		getDownloadService().download(songs, false, true, true, false);
+		Util.startActivityWithoutTransition(context, DownloadActivity.class);
 	}
 	protected void streamExternalPlayer(MusicDirectory.Entry entry) {
 		String videoPlayerType = Util.getVideoPlayerType(context);
