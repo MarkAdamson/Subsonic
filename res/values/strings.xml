@@ -18,8 +18,8 @@
 	<string name="common.name">Name</string>
 	<string name="common.comment">Comment</string>
 	<string name="common.public">Public</string>
-	<string name="common.play_external">Play Video</string>
-	<string name="common.stream_external">Stream Video</string>
+	<string name="common.play_external">Play video external</string>
+	<string name="common.stream_external">Stream video external</string>
 	<string name="common.confirm">Confirm</string>
 	<string name="common.confirm_message">Do you want to %1$s %2$s?</string>
 	<string name="common.empty">None found</string>
