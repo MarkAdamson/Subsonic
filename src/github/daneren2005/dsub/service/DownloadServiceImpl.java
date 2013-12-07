@@ -1144,18 +1144,19 @@ public class DownloadServiceImpl extends Service implements DownloadService {
 			setPlayerState(IDLE);
 			mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
 			String dataSource = file.getPath();
-			if(downloadFile.getSong().isVideo()) {
-				// Get the HLS url
-				MusicService service = MusicServiceFactory.getMusicService(this);
-				int maxBitrate = Util.getMaxVideoBitrate(context);
-				dataSource = service.getHlsUrl(downloadFile.getSong().getId(), maxBitrate, this);
-			}
-			else if(isPartial) {
-				if (proxy == null) {
-					proxy = new StreamProxy(this);
-					proxy.start();
+			if(isPartial) {
+				if(downloadFile.getSong().isVideo()) {
+					// Get the HLS url
+					MusicService service = MusicServiceFactory.getMusicService(this);
+					int maxBitrate = Util.getMaxVideoBitrate(context);
+					dataSource = service.getHlsUrl(downloadFile.getSong().getId(), maxBitrate, this);
+				} else {
+					if (proxy == null) {
+						proxy = new StreamProxy(this);
+						proxy.start();
+					}
+					dataSource = String.format("http://127.0.0.1:%d/%s", proxy.getPort(), URLEncoder.encode(dataSource, Constants.UTF_8));
 				}
-				dataSource = String.format("http://127.0.0.1:%d/%s", proxy.getPort(), URLEncoder.encode(dataSource, Constants.UTF_8));
 				Log.i(TAG, "Data Source: " + dataSource);
 			} else if(proxy != null) {
 				proxy.stop();
