@@ -65,6 +65,8 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.util.Log;
 import android.support.v4.util.LruCache;
+import android.view.SurfaceView;
+
 import java.net.URLEncoder;
 
 /**
@@ -1122,7 +1124,7 @@ public class DownloadServiceImpl extends Service implements DownloadService {
 		bufferAndPlay(0);
 	}
     private synchronized void bufferAndPlay(int position) {
-		if(playerState != PREPARED) {
+		if(playerState != PREPARED && (currentPlaying == null || !currentPlaying.getSong().isVideo())) {
 			reset();
 
 			bufferTask = new BufferTask(currentPlaying, position);
@@ -1148,7 +1150,7 @@ public class DownloadServiceImpl extends Service implements DownloadService {
 				if(downloadFile.getSong().isVideo()) {
 					// Get the HLS url
 					MusicService service = MusicServiceFactory.getMusicService(this);
-					int maxBitrate = Util.getMaxVideoBitrate(context);
+					int maxBitrate = Util.getMaxVideoBitrate(this);
 					dataSource = service.getHlsUrl(downloadFile.getSong().getId(), maxBitrate, this);
 				} else {
 					if (proxy == null) {

@@ -940,7 +940,7 @@ public class SubsonicFragment extends Fragment {
 		if(entryExists(entry)) {
 			playExternalPlayer(entry);
 		} else if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
-			streamIntervalPlayer(entry);
+			streamInternalPlayer(entry);
 		} else {
 			streamExternalPlayer(entry);
 		}
