@@ -18,7 +18,16 @@
  */
 package github.daneren2005.dsub.domain;
 
+import android.content.Context;
+import android.content.SharedPreferences;
+
 import java.io.Serializable;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+
+import github.daneren2005.dsub.util.Constants;
+import github.daneren2005.dsub.util.Util;
 
 /**
  *
@@ -76,5 +85,38 @@ public class PodcastChannel implements Serializable {
 	}
 	public void setErrorMessage(String errorMessage) {
 		this.errorMessage = errorMessage;
+	}
+	
+	public static class PodcastComparator implements Comparator<PodcastChannel> {
+		private static String[] ignoredArticles;
+
+		@Override
+		public int compare(PodcastChannel podcast1, PodcastChannel podcast2) {
+			String lhs = podcast1.getName().toLowerCase();
+			String rhs = podcast2.getName().toLowerCase();
+
+			for(String article: ignoredArticles) {
+				int index = lhs.indexOf(article.toLowerCase() + " ");
+				if(index == 0) {
+					lhs = lhs.substring(article.length() + 1);
+				}
+				index = rhs.indexOf(article.toLowerCase() + " ");
+				if(index == 0) {
+					rhs = rhs.substring(article.length() + 1);
+				}
+			}
+
+			return lhs.compareToIgnoreCase(rhs);
+		}
+
+		public static List<PodcastChannel> sort(List<PodcastChannel> podcasts, Context context) {
+			SharedPreferences prefs = Util.getPreferences(context);
+			String ignoredArticlesString = prefs.getString(Constants.CACHE_KEY_IGNORE, "The El La Los Las Le Les");
+			ignoredArticles = ignoredArticlesString.split(" ");
+
+			Collections.sort(podcasts, new PodcastComparator());
+			return podcasts;
+		}
+
 	}
 }

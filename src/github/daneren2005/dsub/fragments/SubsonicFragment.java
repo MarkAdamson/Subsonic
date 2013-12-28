@@ -202,12 +202,25 @@ public class SubsonicFragment extends Fragment {
 		if(!Util.checkServerVersion(context, "1.10.1")) {
 			menu.setGroupVisible(R.id.server_1_10, false);
 		}
+		SharedPreferences prefs = Util.getPreferences(context);
+		if(!prefs.getBoolean(Constants.PREFERENCES_KEY_MENU_PLAY_NEXT, true)) {
+			menu.setGroupVisible(R.id.hide_play_next, false);
+		}
+		if(!prefs.getBoolean(Constants.PREFERENCES_KEY_MENU_PLAY_LAST, true)) {
+			menu.setGroupVisible(R.id.hide_play_last, false);
+		}
+		if(!prefs.getBoolean(Constants.PREFERENCES_KEY_MENU_STAR, true)) {
+			menu.setGroupVisible(R.id.hide_star, false);
+		}
 	}
 
 	protected void recreateContextMenu(ContextMenu menu) {
 		List<MenuItem> menuItems = new ArrayList<MenuItem>();
 		for(int i = 0; i < menu.size(); i++) {
-			menuItems.add(menu.getItem(i));
+			MenuItem item = menu.getItem(i);
+			if(item.isVisible()) {
+				menuItems.add(item);
+			}
 		}
 		menu.clear();
 		for(int i = 0; i < menuItems.size(); i++) {
@@ -270,6 +283,12 @@ public class SubsonicFragment extends Fragment {
 				break;
 			case R.id.album_menu_delete:
 				deleteRecursively(entry);
+				break;
+			case R.id.album_menu_info:
+				displaySongInfo(entry);
+				break;
+			case R.id.album_menu_show_artist:
+				showArtist((MusicDirectory.Entry) selectedItem);
 				break;
 			case R.id.song_menu_play_now:
 				getDownloadService().clear();
@@ -877,32 +896,39 @@ public class SubsonicFragment extends Fragment {
 		Integer bitrate = null;
 		String format = null;
 		long size = 0;
-		try {
-			DownloadFile downloadFile = new DownloadFile(context, song, false);
-			File file = downloadFile.getCompleteFile();
-			if(file.exists()) {
-				MediaMetadataRetriever metadata = new MediaMetadataRetriever();
-				metadata.setDataSource(file.getAbsolutePath());
-				String tmp = metadata.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE);
-				bitrate = Integer.parseInt((tmp != null) ? tmp : "0") / 1000;
-				format = FileUtil.getExtension(file.getName());
-				size = file.length();
-
-				if(Util.isOffline(context)) {
-					song.setGenre(metadata.extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE));
-					String year = metadata.extractMetadata(MediaMetadataRetriever.METADATA_KEY_YEAR);
-					song.setYear(Integer.parseInt((year != null) ? year : "0"));
+		if(!song.isDirectory()) {
+			try {
+				DownloadFile downloadFile = new DownloadFile(context, song, false);
+				File file = downloadFile.getCompleteFile();
+				if(file.exists()) {
+					MediaMetadataRetriever metadata = new MediaMetadataRetriever();
+					metadata.setDataSource(file.getAbsolutePath());
+					String tmp = metadata.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE);
+					bitrate = Integer.parseInt((tmp != null) ? tmp : "0") / 1000;
+					format = FileUtil.getExtension(file.getName());
+					size = file.length();
+	
+					if(Util.isOffline(context)) {
+						song.setGenre(metadata.extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE));
+						String year = metadata.extractMetadata(MediaMetadataRetriever.METADATA_KEY_YEAR);
+						song.setYear(Integer.parseInt((year != null) ? year : "0"));
+					}
 				}
+			} catch(Exception e) {
+				Log.i(TAG, "Device doesn't properly support MediaMetadataRetreiver");
 			}
-		} catch(Exception e) {
-			Log.i(TAG, "Device doesn't properly support MediaMetadataRetreiver");
 		}
 
 		String msg = "";
 		if(song instanceof PodcastEpisode) {
 			msg += "Podcast: " + song.getArtist() + "\nStatus: " + ((PodcastEpisode)song).getStatus();
 		} else if(!song.isVideo()) {
-			msg += "Artist: " + song.getArtist() + "\nAlbum: " + song.getAlbum();
+			if(song.getArtist() != null && !"".equals(song.getArtist())) {
+				msg += "Artist: " + song.getArtist();
+			}
+			if(song.getAlbum() != null && !"".equals(song.getAlbum())) {
+				msg += "\nAlbum: " + song.getAlbum();
+			}
 		}
 		if(song.getTrack() != null && song.getTrack() != 0) {
 			msg += "\nTrack: " + song.getTrack();
@@ -1032,6 +1058,16 @@ public class SubsonicFragment extends Fragment {
 		if(Util.isOffline(context)) {
 			refresh();
 		}
+	}
+
+	public void showArtist(MusicDirectory.Entry entry) {
+		SubsonicFragment fragment = new SelectDirectoryFragment();
+		Bundle args = new Bundle();
+		args.putString(Constants.INTENT_EXTRA_NAME_ID, entry.getParent());
+		args.putString(Constants.INTENT_EXTRA_NAME_NAME, entry.getArtist());
+		fragment.setArguments(args);
+
+		replaceFragment(fragment, getRootId(), true);
 	}
 	
 	public GestureDetector getGestureDetector() {

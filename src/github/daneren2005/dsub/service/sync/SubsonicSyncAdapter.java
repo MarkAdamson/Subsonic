@@ -34,6 +34,11 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.util.Log;
 
+import java.util.List;
+
+import github.daneren2005.dsub.domain.MusicDirectory;
+import github.daneren2005.dsub.service.CachedMusicService;
+import github.daneren2005.dsub.service.DownloadFile;
 import github.daneren2005.dsub.service.RESTMusicService;
 import github.daneren2005.dsub.util.Constants;
 import github.daneren2005.dsub.util.Util;
@@ -44,7 +49,7 @@ import github.daneren2005.dsub.util.Util;
 
 public class SubsonicSyncAdapter extends AbstractThreadedSyncAdapter {
 	private static final String TAG = SubsonicSyncAdapter.class.getSimpleName();
-	protected RESTMusicService musicService = new RESTMusicService();
+	protected CachedMusicService musicService = new CachedMusicService(new RESTMusicService());
 	private Context context;
 
 	public SubsonicSyncAdapter(Context context, boolean autoInitialize) {
@@ -113,5 +118,30 @@ public class SubsonicSyncAdapter extends AbstractThreadedSyncAdapter {
 	}
 	public void onExecuteSync(Context context, int instance) {
 	
+	}
+	
+	protected boolean downloadRecursively(List<String> paths, MusicDirectory parent, Context context, boolean save) throws Exception {
+		boolean downloaded = false;
+		for (MusicDirectory.Entry song: parent.getChildren(false, true)) {
+			if (!song.isVideo()) {
+				DownloadFile file = new DownloadFile(context, song, save);
+				while(!(save && file.isSaved() || !save && file.isCompleteFileAvailable()) && !file.isFailedMax()) {
+					file.downloadNow(musicService);
+					downloaded = true;
+				}
+
+				if(paths != null && file.isCompleteFileAvailable()) {
+					paths.add(file.getCompleteFile().getPath());
+				}
+			}
+		}
+		
+		for (MusicDirectory.Entry dir: parent.getChildren(true, false)) {
+			if(downloadRecursively(paths, musicService.getMusicDirectory(dir.getId(), dir.getTitle(), true, context, null), context, save)) {
+				downloaded = true;
+			}
+		}
+
+		return downloaded;
 	}
 }

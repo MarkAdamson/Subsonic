@@ -17,7 +17,7 @@
  Copyright 2009 (C) Sindre Mehus
  */
 
-package github.daneren2005.dsub.service.sync;
+package github.daneren2005.dsub.provider;
 
 import android.content.ContentProvider;
 import android.content.ContentValues;
@@ -28,7 +28,7 @@ import android.net.Uri;
  * Created by Scott on 8/28/13.
  */
 
-public class PlaylistStubProvider extends ContentProvider {
+public class PodcastStubProvider extends ContentProvider {
     @Override
     public boolean onCreate() {
         return true;
