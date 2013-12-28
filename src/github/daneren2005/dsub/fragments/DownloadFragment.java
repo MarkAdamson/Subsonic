@@ -1426,14 +1426,17 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 			@Override
 			public void onSessionStartFailed(SessionError error) {
 				// The session could not be started.
+				Log.w(TAG, "Error starting application session: " + error.toString());
 			}
 			
 			@Override
 			public void onSessionEnded(SessionError error) {
 				if (error != null) {
 					// The session ended due to an error.
+					Log.w(TAG, "Error starting application session: " + error.toString());
 				} else {
 					// The session ended normally.
+					Log.i(TAG, "Session ended normally");
 				}
 			}
 		};
@@ -1442,7 +1445,7 @@ public class DownloadFragment extends SubsonicFragment implements OnGestureListe
 		int flags = ApplicationSession.FLAG_DISABLE_NOTIFICATION | ApplicationSession.FLAG_DISABLE_LOCK_SCREEN_REMOTE_CONTROL;
 		applicationSession.setApplicationOptions(flags);
 		
-		String applicationName = "DSub";
+		String applicationName = "ecbc0b3b-b760-4ac5-b441-501fcade38de";
 
 		try {
 			applicationSession.startSession(applicationName);
